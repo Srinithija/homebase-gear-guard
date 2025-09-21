@@ -1,14 +1,24 @@
 [phases.setup]
-nixPkgs = ["nodejs-18_x", "npm-9_x"]
+nixPkgs = ["nodejs-18_x"]
+nixpkgsArchive = "https://github.com/NixOS/nixpkgs/archive/nixos-23.05.tar.gz"
 
 [phases.install]
 cmds = [
-  "npm ci --include=dev",
-  "cd backend && npm ci --include=dev"
+  "npm ci --only=production --no-audit --no-fund",
+  "cd backend && npm ci --only=production --no-audit --no-fund"
 ]
 
 [phases.build]
-cmds = ["cd backend && npm run build"]
+cmds = [
+  "npm ci --include=dev --no-audit --no-fund",
+  "cd backend && npm ci --include=dev --no-audit --no-fund",
+  "cd backend && npm run build"
+]
 
 [start]
 cmd = "cd backend && npm start"
+
+[variables]
+NODE_ENV = "production"
+NPM_CONFIG_AUDIT = "false"
+NPM_CONFIG_FUND = "false"
