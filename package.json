@@ -8,7 +8,10 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start:backend": "cd backend && npm start",
+    "build:backend": "cd backend && npm run build",
+    "install:backend": "cd backend && npm install"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
