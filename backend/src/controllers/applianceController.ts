@@ -86,8 +86,8 @@ export const createAppliance = async (req: Request, res: Response, next: NextFun
     
     const newAppliance = await db.insert(appliances).values({
       ...applianceData,
-      purchaseDate: new Date(applianceData.purchaseDate),
-      warrantyExpiry: new Date(applianceData.warrantyExpiry),
+      purchaseDate: applianceData.purchaseDate, // Keep as string
+      warrantyExpiry: applianceData.warrantyExpiry, // Keep as string
       updatedAt: new Date(),
     }).returning();
     
@@ -103,12 +103,7 @@ export const updateAppliance = async (req: Request, res: Response, next: NextFun
     const updateData = req.body;
     
     const processedData: any = { ...updateData };
-    if (updateData.purchaseDate) {
-      processedData.purchaseDate = new Date(updateData.purchaseDate);
-    }
-    if (updateData.warrantyExpiry) {
-      processedData.warrantyExpiry = new Date(updateData.warrantyExpiry);
-    }
+    // Don't convert dates to Date objects, keep them as strings
     processedData.updatedAt = new Date();
     
     const updatedAppliance = await db.update(appliances)
