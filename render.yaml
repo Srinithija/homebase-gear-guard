@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: homebase-gear-guard
+    env: node
+    region: oregon
+    plan: free
+    buildCommand: |
+      npm install
+      cd backend && npm install
+      npm run build
+      cd backend && npm run build
+    startCommand: cd backend && npm start
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        value: postgresql://postgres:Srinithija02@db.llwasxekjvvezufpyolq.supabase.co:5432/postgres
+      - key: CORS_ORIGIN
+        sync: false

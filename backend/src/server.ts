@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
+import path from 'path';
 import { env } from './config/env';
 import { testConnection } from './config/database';
 import routes from './routes';
@@ -35,16 +36,21 @@ app.get('/health', (req, res) => {
   });
 });
 
+// Serve static files in production
+if (env.NODE_ENV === 'production') {
+  // Serve static files from React build
+  app.use(express.static(path.join(__dirname, '../../dist')));
+  
+  // Handle React routing, return all requests to React app
+  app.get('*', (req, res) => {
+    if (!req.url.startsWith('/api') && !req.url.startsWith('/health')) {
+      res.sendFile(path.join(__dirname, '../../dist', 'index.html'));
+    }
+  });
+}
+
 // Error handling
 app.use(errorHandler);
-
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({
-    success: false,
-    message: 'Route not found',
-  });
-});
 
 const PORT = env.PORT || 3001;
 
