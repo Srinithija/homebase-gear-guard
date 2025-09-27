@@ -26,7 +26,7 @@ This project is configured for one-click deployment to Render using the `render.
    - **Environment**: `Node`
    - **Build Command**: 
      ```bash
-     npm install && cd backend && npm install && npm run build && cd .. && npm run build
+     npm install && cd backend && npm install && cd backend && npm run build && cd .. && npm run build
      ```
    - **Start Command**: 
      ```bash
@@ -68,7 +68,9 @@ This project is configured for one-click deployment to Render using the `render.
 
 ### Troubleshooting
 
+- **Build Fails with "exit code: 127"**: This usually means TypeScript compiler is not found. Fixed by moving TypeScript to dependencies.
 - **Build Fails**: Check build logs in Render dashboard
 - **CORS Errors**: Ensure CORS_ORIGIN matches your Render URL
 - **API Not Working**: Verify environment variables are set correctly
 - **Static Files**: Check that frontend build files are in `dist/` folder
+- **TypeScript Errors**: Run `npm run build:check` locally to verify compilation
