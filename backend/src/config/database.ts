@@ -44,27 +44,30 @@ export const db = drizzle(sql, { schema });
 
 // Simple connection test function that tries each URL sequentially
 export const testConnection = async () => {
-  // Hardcoded fallback URLs with correct pooler authentication format
+  // Try multiple username formats for better compatibility
   const fallbackUrls = {
-    pooler_session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
-    pooler_transaction: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
-    pooler_timeout: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=10'
+    pooler_dot_format: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
+    pooler_standard: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
+    pooler_session_dot: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
+    pooler_session_standard: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
+    direct_connection: 'postgresql://postgres:Srinithija02@db.llwasxekjvvezufpyolq.supabase.co:5432/postgres?sslmode=require'
   };
 
-  // Focus on pooler connections only to avoid IPv6 issues
+  // Test multiple formats to find the working one
   const connectionUrls = [
-    { name: 'Transaction Pooler', url: env.DATABASE_URL.includes('pooler') ? env.DATABASE_URL : fallbackUrls.pooler_transaction },
-    { name: 'Session Pooler', url: process.env.DATABASE_URL_POOLER_SESSION || process.env['DATABASE_URL_POOLER_SESSION'] || fallbackUrls.pooler_session },
-    { name: 'Pooler with Timeout', url: process.env.DATABASE_URL_FALLBACK || process.env['DATABASE_URL_FALLBACK'] || fallbackUrls.pooler_timeout },
-    { name: 'Alternative Pooler', url: process.env.DATABASE_URL_IPv4_DIRECT || process.env['DATABASE_URL_IPv4_DIRECT'] || fallbackUrls.pooler_transaction }
-  ].filter(option => option.url);
+    { name: 'Transaction Pooler (Dot Format)', url: fallbackUrls.pooler_dot_format },
+    { name: 'Transaction Pooler (Standard)', url: fallbackUrls.pooler_standard },
+    { name: 'Session Pooler (Dot Format)', url: fallbackUrls.pooler_session_dot },
+    { name: 'Session Pooler (Standard)', url: fallbackUrls.pooler_session_standard },
+    { name: 'Direct Connection (Test)', url: fallbackUrls.direct_connection }
+  ];
 
   console.log(`🔗 Testing ${connectionUrls.length} database connection options...`);
-  console.log('📍 Primary DATABASE_URL check:', env.DATABASE_URL.includes('pooler') ? '✅ Using pooler' : '⚠️ Using old hostname');
-  console.log('📍 Available URLs:');
-  connectionUrls.forEach(({ name, url }) => {
-    console.log(`   ${name}: ${url!.replace(/:[^:@]*@/, ':****@')}`);
-  });
+  console.log('📍 Diagnostic Information:');
+  console.log('   Project Ref: llwasxekjvvezufpyolq');
+  console.log('   Password: Srinithija02');
+  console.log('   Region: aws-0-ap-south-1');
+  console.log('');
 
   for (const { name, url } of connectionUrls) {
     try {
@@ -74,7 +77,7 @@ export const testConnection = async () => {
       // Create a simple test connection with timeout
       const testConfig = {
         ...connectionConfig,
-        connect_timeout: 10, // Longer timeout for pooler connections
+        connect_timeout: 15, // Longer timeout for thorough testing
         max: 1 // Single connection for testing
       };
       
@@ -100,10 +103,14 @@ export const testConnection = async () => {
       } else if (errorWithCode.code === 'ECONNREFUSED') {
         console.error('🔍 Connection refused - server not accepting connections');
       } else if ((error as Error).message.includes('Tenant or user not found')) {
-        console.error('🔍 Authentication failed - pooler credential format issue');
-        console.error('   💡 Tip: Verify username format for pooler connections');
+        console.error('🔍 Authentication failed - possible causes:');
+        console.error('   - Supabase project is paused (check dashboard)');
+        console.error('   - Incorrect username format for this pooler type');
+        console.error('   - Wrong password or project reference');
       } else if ((error as Error).message.includes('password authentication failed')) {
-        console.error('🔍 Password authentication failed - check credentials');
+        console.error('🔍 Password authentication failed');
+        console.error('   - Check password: Srinithija02');
+        console.error('   - Verify project reference: llwasxekjvvezufpyolq');
       }
       
       // Continue to next option
@@ -112,11 +119,13 @@ export const testConnection = async () => {
   }
   
   console.error('❌ All database connection options failed');
-  console.error('🔧 Troubleshooting suggestions:');
-  console.error('   1. Verify Supabase project is active and not paused');
-  console.error('   2. Check database password is correct: Srinithija02');
-  console.error('   3. Confirm project reference: llwasxekjvvezufpyolq');
-  console.error('   4. Try manual connection test with pooler URL');
+  console.error('');
+  console.error('🚑 CRITICAL: Check Supabase Project Status');
+  console.error('   1. 🔗 Visit: https://app.supabase.com/project/llwasxekjvvezufpyolq');
+  console.error('   2. ⚙️ Verify project is not paused');
+  console.error('   3. 🔑 Check Settings > Database > Connection info');
+  console.error('   4. 💳 Upgrade to paid plan if paused due to inactivity');
+  console.error('');
   return false;
 };
 
