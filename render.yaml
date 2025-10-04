@@ -19,6 +19,10 @@ services:
       - key: PORT
         value: 10000
       - key: DATABASE_URL
-        value: postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require
+        value: postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&options=-c%20default_transaction_isolation%3Dread%20committed
+      - key: DATABASE_URL_FALLBACK
+        value: postgresql://postgres:Srinithija02@db.llwasxekjvvezufpyolq.supabase.co:5432/postgres?sslmode=require
+      - key: DATABASE_URL_POOLER_SESSION
+        value: postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true
       - key: CORS_ORIGIN
         value: https://homebase-gear-guard.onrender.com
