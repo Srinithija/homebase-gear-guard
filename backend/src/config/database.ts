@@ -22,13 +22,16 @@ const connectionConfig = {
 // Create connection with fallback URLs
 const createConnectionWithFallback = () => {
   // Try multiple connection options in order of preference
+  const poolerUrl = 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require';
+  
   const connectionUrls = [
-    env.DATABASE_URL, // Primary: Transaction pooler
-    process.env.DATABASE_URL_POOLER_SESSION, // Fallback 1: Session pooler
-    process.env.DATABASE_URL_FALLBACK // Fallback 2: Direct connection
+    env.DATABASE_URL.includes('pooler') ? env.DATABASE_URL : poolerUrl, // Primary: Use pooler if main URL is old
+    process.env.DATABASE_URL_POOLER_SESSION || 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
+    process.env.DATABASE_URL_FALLBACK || poolerUrl
   ].filter(Boolean);
 
   console.log('🔄 Available connection URLs:', connectionUrls.length);
+  console.log('📍 Using primary URL:', connectionUrls[0]!.replace(/:[^:@]*@/, ':****@'));
   
   // Use the primary URL with optimized config
   return postgres(connectionUrls[0]!, connectionConfig);
@@ -40,14 +43,27 @@ export const db = drizzle(sql, { schema });
 
 // Simple connection test function that tries each URL sequentially
 export const testConnection = async () => {
+  // Hardcoded fallback URLs in case environment variables aren't set properly
+  const fallbackUrls = {
+    pooler_session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
+    pooler_transaction: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
+    pooler_timeout: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=10'
+  };
+
+  // Ensure all environment variables are loaded with fallbacks
   const connectionUrls = [
-    { name: 'Transaction Pooler', url: env.DATABASE_URL },
-    { name: 'Session Pooler', url: process.env.DATABASE_URL_POOLER_SESSION },
-    { name: 'Fallback Connection', url: process.env.DATABASE_URL_FALLBACK },
-    { name: 'IPv4 Direct Connection', url: process.env.DATABASE_URL_IPv4_DIRECT }
+    { name: 'Transaction Pooler', url: env.DATABASE_URL.includes('pooler') ? env.DATABASE_URL : fallbackUrls.pooler_transaction },
+    { name: 'Session Pooler', url: process.env.DATABASE_URL_POOLER_SESSION || process.env['DATABASE_URL_POOLER_SESSION'] || fallbackUrls.pooler_session },
+    { name: 'Fallback Connection', url: process.env.DATABASE_URL_FALLBACK || process.env['DATABASE_URL_FALLBACK'] || fallbackUrls.pooler_timeout },
+    { name: 'IPv4 Direct Connection', url: process.env.DATABASE_URL_IPv4_DIRECT || process.env['DATABASE_URL_IPv4_DIRECT'] || fallbackUrls.pooler_transaction }
   ].filter(option => option.url);
 
   console.log(`🔗 Testing ${connectionUrls.length} database connection options...`);
+  console.log('📍 Primary DATABASE_URL check:', env.DATABASE_URL.includes('pooler') ? '✅ Using pooler' : '⚠️ Using old hostname');
+  console.log('📍 Available URLs:');
+  connectionUrls.forEach(({ name, url }) => {
+    console.log(`   ${name}: ${url!.replace(/:[^:@]*@/, ':****@')}`);
+  });
 
   for (const { name, url } of connectionUrls) {
     try {
