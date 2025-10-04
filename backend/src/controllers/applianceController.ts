@@ -45,6 +45,26 @@ export const getAppliances = async (req: Request, res: Response, next: NextFunct
     
     return successResponse(res, filteredAppliances, 'Appliances retrieved successfully');
   } catch (error) {
+    // If database connection fails, return helpful message
+    if (error && typeof error === 'object' && 'message' in error && 
+        (error.message as string).includes('Tenant or user not found')) {
+      return res.status(503).json({
+        success: false,
+        message: '🚨 Database temporarily unavailable - Supabase project may be paused',
+        data: [],
+        fallbackMode: true,
+        instructions: {
+          action: 'Resume Supabase Project',
+          url: 'https://app.supabase.com/project/llwasxekjvvezufpyolq',
+          steps: [
+            '1. Visit Supabase dashboard',
+            '2. Check if project is paused',
+            '3. Click "Resume" or upgrade plan',
+            '4. Refresh this page'
+          ]
+        }
+      });
+    }
     next(error);
   }
 };
