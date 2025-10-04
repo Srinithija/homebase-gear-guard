@@ -72,11 +72,14 @@ const PORT = env.PORT || 3001;
 // Start server with optional database connection test
 const startServer = async () => {
   try {
-    // Test database connection (don't exit if it fails)
-    const dbConnected = await testConnection();
-    if (!dbConnected) {
-      console.warn('⚠️ Database connection failed - app will still start for debugging');
-    }
+    // Skip database connection test on startup for debugging
+    console.log('⚠️ Skipping database connection test on startup - will test via health endpoint');
+    console.log('📍 Primary DATABASE_URL:', env.DATABASE_URL.replace(/:[^:@]*@/, ':****@'));
+    console.log('📍 Available fallback URLs:', [
+      process.env.DATABASE_URL_POOLER_SESSION ? 'Session Pooler' : null,
+      process.env.DATABASE_URL_FALLBACK ? 'Fallback' : null,
+      process.env.DATABASE_URL_IPv4_DIRECT ? 'IPv4 Direct' : null
+    ].filter(Boolean).join(', '));
 
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
@@ -84,10 +87,7 @@ const startServer = async () => {
       console.log(`🌐 CORS Origin: ${env.CORS_ORIGIN}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
       console.log(`📡 API Base URL: http://localhost:${PORT}/api`);
-      
-      if (!dbConnected) {
-        console.log('🔧 Database connection issues detected. Check logs above.');
-      }
+      console.log('🔧 Database connection will be tested via health endpoint');
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);

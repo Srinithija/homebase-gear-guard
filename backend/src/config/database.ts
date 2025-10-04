@@ -2,35 +2,13 @@ import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from '../db/schema';
 import { env } from './env';
-import { lookup } from 'dns';
-import { promisify } from 'util';
 
-const lookupAsync = promisify(lookup);
-
-// Force IPv4 by resolving hostname to IPv4 address
-const forceIPv4Connection = async (url: string): Promise<string> => {
-  try {
-    const urlObj = new URL(url);
-    const hostname = urlObj.hostname;
-    
-    console.log(`🔍 Resolving ${hostname} to IPv4...`);
-    const { address } = await lookupAsync(hostname, { family: 4 });
-    console.log(`✅ Resolved to IPv4: ${address}`);
-    
-    // Replace hostname with IPv4 address
-    return url.replace(hostname, address);
-  } catch (error) {
-    console.warn(`⚠️ IPv4 resolution failed for ${url}:`, error);
-    return url; // Return original URL as fallback
-  }
-};
-
-// Connection pooler optimized configuration
+// Optimized connection configuration for cloud platforms
 const connectionConfig = {
-  // Connection pool settings for pgbouncer compatibility
+  // Connection pool settings
   max: 1, // Single connection for connection pooler
   idle_timeout: 0, // Disable idle timeout for pooler
-  connect_timeout: 15, // Longer timeout for IPv4 resolution
+  connect_timeout: 10, // Connection timeout
   // SSL configuration for production
   ssl: env.NODE_ENV === 'production' ? 'require' as const : false,
   // Disable prepared statements for pgbouncer compatibility
@@ -60,68 +38,61 @@ const createConnectionWithFallback = () => {
 const sql = createConnectionWithFallback();
 export const db = drizzle(sql, { schema });
 
-// Connection test function with IPv4 resolution and fallbacks
+// Simple connection test function that tries each URL sequentially
 export const testConnection = async () => {
   const connectionUrls = [
     { name: 'Transaction Pooler', url: env.DATABASE_URL },
     { name: 'Session Pooler', url: process.env.DATABASE_URL_POOLER_SESSION },
-    { name: 'Direct Connection', url: process.env.DATABASE_URL_FALLBACK },
+    { name: 'Fallback Connection', url: process.env.DATABASE_URL_FALLBACK },
     { name: 'IPv4 Direct Connection', url: process.env.DATABASE_URL_IPv4_DIRECT }
   ].filter(option => option.url);
 
+  console.log(`🔗 Testing ${connectionUrls.length} database connection options...`);
+
   for (const { name, url } of connectionUrls) {
     try {
-      console.log(`🔗 Testing ${name}...`);
-      console.log('📍 Database URL:', url!.replace(/:[^:@]*@/, ':****@')); // Hide password
-      console.log('🌐 Environment:', env.NODE_ENV);
+      console.log(`📍 Testing ${name}...`);
+      console.log('🔗 URL:', url!.replace(/:[^:@]*@/, ':****@')); // Hide password
       
-      let finalUrl = url!;
+      // Create a simple test connection with timeout
+      const testConfig = {
+        ...connectionConfig,
+        connect_timeout: 5, // Short timeout for testing
+        max: 1 // Single connection for testing
+      };
       
-      // For non-IPv4 direct connections, try IPv4 resolution
-      if (!name.includes('IPv4 Direct')) {
-        try {
-          finalUrl = await forceIPv4Connection(url!);
-          console.log('🔗 Using IPv4 URL:', finalUrl.replace(/:[^:@]*@/, ':****@'));
-        } catch (error) {
-          console.log('⚠️ IPv4 resolution failed, using original URL');
-        }
-      }
+      const testSql = postgres(url!, testConfig);
       
-      const testSql = postgres(finalUrl, connectionConfig);
-      await testSql`SELECT 1`;
+      // Simple connectivity test
+      await testSql`SELECT 1 as test`;
       await testSql.end();
       
-      console.log(`✅ ${name} connection successful`);
+      console.log(`✅ ${name} connection successful!`);
       return true;
     } catch (error) {
-      console.error(`❌ ${name} connection failed:`, error);
+      console.error(`❌ ${name} failed:`, (error as Error).message);
       
-      // Additional debugging info
-      const errorWithCode = error as { code?: string; address?: string; syscall?: string };
-      
+      // Additional debugging for common errors
+      const errorWithCode = error as { code?: string; address?: string };
       if (errorWithCode.code === 'ENOTFOUND') {
-        console.error('🔍 DNS Resolution failed - possible causes:');
-        console.error('   - Incorrect hostname in DATABASE_URL');
-        console.error('   - Network connectivity issues');
-        console.error('   - Supabase project might be paused/deleted');
+        console.error('🔍 DNS resolution failed - hostname not found');
       } else if (errorWithCode.code === 'ENETUNREACH') {
-        console.error('🔍 Network unreachable - possible causes:');
-        console.error('   - IPv6 connectivity issues (trying to force IPv4)');
-        console.error('   - Firewall blocking connection');
-        console.error('   - Cloud platform network restrictions');
-        console.error('   - Address:', errorWithCode.address);
+        console.error('🔍 Network unreachable - IPv6/IPv4 connectivity issue');
+        console.error('   Address attempted:', errorWithCode.address);
       } else if (errorWithCode.code === 'ECONNREFUSED') {
-        console.error('🔍 Connection refused - possible causes:');
-        console.error('   - Database server is down');
-        console.error('   - Port blocked');
-        console.error('   - Incorrect credentials');
+        console.error('🔍 Connection refused - server not accepting connections');
       }
       
-      console.log(`🔄 Trying next connection option...`);
+      // Continue to next option
+      continue;
     }
   }
   
-  console.error('❌ All connection options failed');
+  console.error('❌ All database connection options failed');
+  console.error('🔧 Suggestions:');
+  console.error('   1. Check if Supabase project is active and not paused');
+  console.error('   2. Verify database credentials are correct');
+  console.error('   3. Ensure network allows outbound connections to Supabase');
   return false;
 };
 
