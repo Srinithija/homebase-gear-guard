@@ -1,5 +1,4 @@
 import { Appliance, MaintenanceTask, Contact } from '@/types/appliance';
-import { Appliance, MaintenanceTask, Contact } from '@/types/appliance';
 import { apiClient } from './api';
 
 // Fallback localStorage functions (for development/offline mode)
@@ -21,7 +20,7 @@ export const getAppliances = async (): Promise<Appliance[]> => {
     } catch (error) {
       console.error('❌ Failed to fetch appliances from API:', error);
       // Instead of falling back to localStorage, throw the error to debug
-      throw new Error(`API call failed: ${error.message}`);
+      throw new Error(`API call failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   } else {
     const data = localStorage.getItem(APPLIANCES_KEY);
