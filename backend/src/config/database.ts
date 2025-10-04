@@ -10,11 +10,23 @@ export const db = drizzle(sql, { schema });
 // Connection test function
 export const testConnection = async () => {
   try {
+    console.log('🔗 Testing database connection...');
+    console.log('📍 Database URL:', env.DATABASE_URL.replace(/:[^:@]*@/, ':****@')); // Hide password
+    
     await sql`SELECT 1`;
     console.log('✅ Database connection successful');
     return true;
   } catch (error) {
     console.error('❌ Database connection failed:', error);
+    
+    // Additional debugging info
+    if (error.code === 'ENOTFOUND') {
+      console.error('🔍 DNS Resolution failed - possible causes:');
+      console.error('   - Incorrect hostname in DATABASE_URL');
+      console.error('   - Network connectivity issues');
+      console.error('   - Supabase project might be paused/deleted');
+    }
+    
     return false;
   }
 };
