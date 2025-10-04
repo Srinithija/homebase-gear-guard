@@ -19,8 +19,9 @@ export const testConnection = async () => {
   } catch (error) {
     console.error('❌ Database connection failed:', error);
     
-    // Additional debugging info
-    if (error.code === 'ENOTFOUND') {
+    // Additional debugging info with proper type checking
+    const errorWithCode = error as { code?: string };
+    if (errorWithCode.code === 'ENOTFOUND') {
       console.error('🔍 DNS Resolution failed - possible causes:');
       console.error('   - Incorrect hostname in DATABASE_URL');
       console.error('   - Network connectivity issues');
