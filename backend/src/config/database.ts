@@ -19,17 +19,16 @@ const connectionConfig = {
   }
 };
 
-// Create connection with fallback URLs
+// Create connection with pooler URLs only (avoid IPv6 issues)
 const createConnectionWithFallback = () => {
-  // Try multiple connection options in order of preference
+  // Use pooler URLs only to avoid IPv6 connectivity issues
   const poolerUrl = 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require';
-  const directUrl = 'postgresql://postgres:Srinithija02@db.llwasxekjvvezufpyolq.supabase.co:5432/postgres?sslmode=require';
   
   const connectionUrls = [
     env.DATABASE_URL.includes('pooler') ? env.DATABASE_URL : poolerUrl, // Primary: Use pooler if main URL is old
     process.env.DATABASE_URL_POOLER_SESSION || 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
-    process.env.DATABASE_URL_FALLBACK || directUrl, // Direct connection as fallback
-    directUrl // Final fallback to direct connection
+    process.env.DATABASE_URL_FALLBACK || poolerUrl, // Pooler connection with timeout
+    poolerUrl // Final fallback to pooler
   ].filter(Boolean);
 
   console.log('🔄 Available connection URLs:', connectionUrls.length);
@@ -45,20 +44,19 @@ export const db = drizzle(sql, { schema });
 
 // Simple connection test function that tries each URL sequentially
 export const testConnection = async () => {
-  // Hardcoded fallback URLs in case environment variables aren't set properly
+  // Hardcoded fallback URLs with correct pooler authentication format
   const fallbackUrls = {
     pooler_session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
     pooler_transaction: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
-    direct_connection: 'postgresql://postgres:Srinithija02@db.llwasxekjvvezufpyolq.supabase.co:5432/postgres?sslmode=require',
     pooler_timeout: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=10'
   };
 
-  // Ensure all environment variables are loaded with fallbacks
+  // Focus on pooler connections only to avoid IPv6 issues
   const connectionUrls = [
     { name: 'Transaction Pooler', url: env.DATABASE_URL.includes('pooler') ? env.DATABASE_URL : fallbackUrls.pooler_transaction },
     { name: 'Session Pooler', url: process.env.DATABASE_URL_POOLER_SESSION || process.env['DATABASE_URL_POOLER_SESSION'] || fallbackUrls.pooler_session },
-    { name: 'Direct Connection (Fallback)', url: process.env.DATABASE_URL_FALLBACK || process.env['DATABASE_URL_FALLBACK'] || fallbackUrls.direct_connection },
-    { name: 'IPv4 Direct Connection', url: process.env.DATABASE_URL_IPv4_DIRECT || process.env['DATABASE_URL_IPv4_DIRECT'] || fallbackUrls.pooler_transaction }
+    { name: 'Pooler with Timeout', url: process.env.DATABASE_URL_FALLBACK || process.env['DATABASE_URL_FALLBACK'] || fallbackUrls.pooler_timeout },
+    { name: 'Alternative Pooler', url: process.env.DATABASE_URL_IPv4_DIRECT || process.env['DATABASE_URL_IPv4_DIRECT'] || fallbackUrls.pooler_transaction }
   ].filter(option => option.url);
 
   console.log(`🔗 Testing ${connectionUrls.length} database connection options...`);
@@ -76,7 +74,7 @@ export const testConnection = async () => {
       // Create a simple test connection with timeout
       const testConfig = {
         ...connectionConfig,
-        connect_timeout: 8, // Longer timeout for testing
+        connect_timeout: 10, // Longer timeout for pooler connections
         max: 1 // Single connection for testing
       };
       
@@ -102,7 +100,10 @@ export const testConnection = async () => {
       } else if (errorWithCode.code === 'ECONNREFUSED') {
         console.error('🔍 Connection refused - server not accepting connections');
       } else if ((error as Error).message.includes('Tenant or user not found')) {
-        console.error('🔍 Authentication failed - check credentials and project status');
+        console.error('🔍 Authentication failed - pooler credential format issue');
+        console.error('   💡 Tip: Verify username format for pooler connections');
+      } else if ((error as Error).message.includes('password authentication failed')) {
+        console.error('🔍 Password authentication failed - check credentials');
       }
       
       // Continue to next option
@@ -111,11 +112,11 @@ export const testConnection = async () => {
   }
   
   console.error('❌ All database connection options failed');
-  console.error('🔧 Suggestions:');
-  console.error('   1. Check if Supabase project is active and not paused');
-  console.error('   2. Verify database credentials are correct');
-  console.error('   3. For pooler connections, ensure correct username format');
-  console.error('   4. Check if direct connection works (bypasses pooler auth issues)');
+  console.error('🔧 Troubleshooting suggestions:');
+  console.error('   1. Verify Supabase project is active and not paused');
+  console.error('   2. Check database password is correct: Srinithija02');
+  console.error('   3. Confirm project reference: llwasxekjvvezufpyolq');
+  console.error('   4. Try manual connection test with pooler URL');
   return false;
 };
 
