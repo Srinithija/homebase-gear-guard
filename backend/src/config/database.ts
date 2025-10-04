@@ -3,15 +3,15 @@ import postgres from 'postgres';
 import * as schema from '../db/schema';
 import { env } from './env';
 
-// Render.com optimized connection configuration
+// Connection pooler optimized configuration
 const connectionConfig = {
-  // Connection pool settings optimized for cloud deployment
-  max: 5, // Lower connection pool for free tier
-  idle_timeout: 20,
-  connect_timeout: 30,
+  // Connection pool settings for pgbouncer compatibility
+  max: 1, // Single connection for connection pooler
+  idle_timeout: 0, // Disable idle timeout for pooler
+  connect_timeout: 10, // Shorter timeout for pooler
   // SSL configuration for production
-  ssl: env.NODE_ENV === 'production',
-  // Disable prepared statements for better compatibility
+  ssl: env.NODE_ENV === 'production' ? 'require' as const : false,
+  // Disable prepared statements for pgbouncer compatibility
   prepare: false,
   // Connection handling
   transform: {
