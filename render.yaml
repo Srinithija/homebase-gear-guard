@@ -5,10 +5,12 @@ services:
     region: oregon
     plan: free
     buildCommand: |
-      npm install
-      cd backend && npm install
-      cd backend && npm run build
-      cd .. && npm run build
+      npm ci
+      cd backend
+      npm ci
+      npm run build
+      cd ..
+      npm run build
     startCommand: cd backend && npm start
     healthCheckPath: /health
     envVars:
@@ -19,4 +21,4 @@ services:
       - key: DATABASE_URL
         value: postgresql://postgres:Srinithija02@db.llwasxekjvvezufpyolq.supabase.co:5432/postgres
       - key: CORS_ORIGIN
-        sync: false
+        value: https://homebase-gear-guard.onrender.com
