@@ -22,11 +22,11 @@ const connectionConfig = {
 // Create connection with pooler URLs only (avoid IPv6 issues)
 const createConnectionWithFallback = () => {
   // Use pooler URLs only to avoid IPv6 connectivity issues
-  const poolerUrl = 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require';
+  const poolerUrl = 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require';
   
   const connectionUrls = [
     env.DATABASE_URL.includes('pooler') ? env.DATABASE_URL : poolerUrl, // Primary: Use pooler if main URL is old
-    process.env.DATABASE_URL_POOLER_SESSION || 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
+    process.env.DATABASE_URL_POOLER_SESSION || 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
     process.env.DATABASE_URL_FALLBACK || poolerUrl, // Pooler connection with timeout
     poolerUrl // Final fallback to pooler
   ].filter(Boolean);
@@ -46,9 +46,9 @@ export const db = drizzle(sql, { schema });
 export const testConnection = async () => {
   // Hardcoded fallback URLs with correct pooler authentication format
   const fallbackUrls = {
-    pooler_session: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
-    pooler_transaction: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
-    pooler_timeout: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=10'
+    pooler_session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
+    pooler_transaction: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
+    pooler_timeout: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=10'
   };
 
   // Focus on pooler connections only to avoid IPv6 issues
