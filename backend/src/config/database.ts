@@ -23,11 +23,13 @@ const connectionConfig = {
 const createConnectionWithFallback = () => {
   // Try multiple connection options in order of preference
   const poolerUrl = 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require';
+  const directUrl = 'postgresql://postgres:Srinithija02@db.llwasxekjvvezufpyolq.supabase.co:5432/postgres?sslmode=require';
   
   const connectionUrls = [
     env.DATABASE_URL.includes('pooler') ? env.DATABASE_URL : poolerUrl, // Primary: Use pooler if main URL is old
     process.env.DATABASE_URL_POOLER_SESSION || 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
-    process.env.DATABASE_URL_FALLBACK || poolerUrl
+    process.env.DATABASE_URL_FALLBACK || directUrl, // Direct connection as fallback
+    directUrl // Final fallback to direct connection
   ].filter(Boolean);
 
   console.log('🔄 Available connection URLs:', connectionUrls.length);
@@ -47,6 +49,7 @@ export const testConnection = async () => {
   const fallbackUrls = {
     pooler_session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
     pooler_transaction: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
+    direct_connection: 'postgresql://postgres:Srinithija02@db.llwasxekjvvezufpyolq.supabase.co:5432/postgres?sslmode=require',
     pooler_timeout: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=10'
   };
 
@@ -54,7 +57,7 @@ export const testConnection = async () => {
   const connectionUrls = [
     { name: 'Transaction Pooler', url: env.DATABASE_URL.includes('pooler') ? env.DATABASE_URL : fallbackUrls.pooler_transaction },
     { name: 'Session Pooler', url: process.env.DATABASE_URL_POOLER_SESSION || process.env['DATABASE_URL_POOLER_SESSION'] || fallbackUrls.pooler_session },
-    { name: 'Fallback Connection', url: process.env.DATABASE_URL_FALLBACK || process.env['DATABASE_URL_FALLBACK'] || fallbackUrls.pooler_timeout },
+    { name: 'Direct Connection (Fallback)', url: process.env.DATABASE_URL_FALLBACK || process.env['DATABASE_URL_FALLBACK'] || fallbackUrls.direct_connection },
     { name: 'IPv4 Direct Connection', url: process.env.DATABASE_URL_IPv4_DIRECT || process.env['DATABASE_URL_IPv4_DIRECT'] || fallbackUrls.pooler_transaction }
   ].filter(option => option.url);
 
@@ -73,7 +76,7 @@ export const testConnection = async () => {
       // Create a simple test connection with timeout
       const testConfig = {
         ...connectionConfig,
-        connect_timeout: 5, // Short timeout for testing
+        connect_timeout: 8, // Longer timeout for testing
         max: 1 // Single connection for testing
       };
       
@@ -84,6 +87,7 @@ export const testConnection = async () => {
       await testSql.end();
       
       console.log(`✅ ${name} connection successful!`);
+      console.log('🎉 Using this connection for the application');
       return true;
     } catch (error) {
       console.error(`❌ ${name} failed:`, (error as Error).message);
@@ -97,6 +101,8 @@ export const testConnection = async () => {
         console.error('   Address attempted:', errorWithCode.address);
       } else if (errorWithCode.code === 'ECONNREFUSED') {
         console.error('🔍 Connection refused - server not accepting connections');
+      } else if ((error as Error).message.includes('Tenant or user not found')) {
+        console.error('🔍 Authentication failed - check credentials and project status');
       }
       
       // Continue to next option
@@ -108,7 +114,8 @@ export const testConnection = async () => {
   console.error('🔧 Suggestions:');
   console.error('   1. Check if Supabase project is active and not paused');
   console.error('   2. Verify database credentials are correct');
-  console.error('   3. Ensure network allows outbound connections to Supabase');
+  console.error('   3. For pooler connections, ensure correct username format');
+  console.error('   4. Check if direct connection works (bypasses pooler auth issues)');
   return false;
 };
 
