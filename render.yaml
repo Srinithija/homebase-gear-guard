@@ -19,6 +19,6 @@ services:
       - key: PORT
         value: 10000
       - key: DATABASE_URL
-        sync: false
+        value: postgresql://postgres:Srinithija02@db.llwasxekjvvezufpyolq.supabase.co:5432/postgres?sslmode=require&connect_timeout=60
       - key: CORS_ORIGIN
         value: https://homebase-gear-guard.onrender.com
