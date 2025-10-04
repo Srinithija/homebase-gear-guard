@@ -32,26 +32,40 @@ const AddAppliance = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
-    if (isEditing && id) {
-      const appliances = getAppliances();
-      const appliance = appliances.find(a => a.id === id);
-      if (appliance) {
-        setFormData({
-          name: appliance.name,
-          brand: appliance.brand,
-          model: appliance.model,
-          serialNumber: appliance.serialNumber || '',
-          purchaseDate: appliance.purchaseDate,
-          warrantyPeriodMonths: appliance.warrantyPeriodMonths,
-          purchaseLocation: appliance.purchaseLocation || '',
-          manualLink: appliance.manualLink || '',
-          receiptLink: appliance.receiptLink || '',
-        });
-      } else {
-        navigate('/appliances');
+    const loadApplianceData = async () => {
+      if (isEditing && id) {
+        try {
+          const appliances = await getAppliances();
+          const appliance = appliances.find(a => a.id === id);
+          if (appliance) {
+            setFormData({
+              name: appliance.name,
+              brand: appliance.brand,
+              model: appliance.model,
+              serialNumber: appliance.serialNumber || '',
+              purchaseDate: appliance.purchaseDate,
+              warrantyPeriodMonths: appliance.warrantyPeriodMonths,
+              purchaseLocation: appliance.purchaseLocation || '',
+              manualLink: appliance.manualLink || '',
+              receiptLink: appliance.receiptLink || '',
+            });
+          } else {
+            navigate('/appliances');
+          }
+        } catch (error) {
+          console.error('Error loading appliance data:', error);
+          toast({
+            title: "Error",
+            description: "Failed to load appliance data.",
+            variant: "destructive",
+          });
+          navigate('/appliances');
+        }
       }
-    }
-  }, [isEditing, id, navigate]);
+    };
+
+    loadApplianceData();
+  }, [isEditing, id, navigate, toast]);
 
   const handleInputChange = (field: string, value: string | number) => {
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -85,7 +99,7 @@ const AddAppliance = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
@@ -94,7 +108,7 @@ const AddAppliance = () => {
     
     try {
       if (isEditing && id) {
-        const updatedAppliance = updateAppliance(id, {
+        const updatedAppliance = await updateAppliance(id, {
           ...formData,
           warrantyExpiry,
         });
@@ -106,7 +120,7 @@ const AddAppliance = () => {
           navigate('/appliances');
         }
       } else {
-        const newAppliance = addAppliance({
+        const newAppliance = await addAppliance({
           ...formData,
           warrantyExpiry,
         });
@@ -117,6 +131,7 @@ const AddAppliance = () => {
         navigate('/appliances');
       }
     } catch (error) {
+      console.error('Error saving appliance:', error);
       toast({
         title: "Error",
         description: "An error occurred while saving the appliance.",

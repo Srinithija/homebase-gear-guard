@@ -81,10 +81,10 @@ export const createMaintenanceTask = async (req: Request, res: Response, next: N
       return res.status(404).json(errorResponse('Appliance not found'));
     }
     
+    // Keep dates as strings, don't convert to Date objects
     const processedData = {
       ...taskData,
-      date: new Date(taskData.date),
-      reminderDate: new Date(taskData.reminderDate),
+      // date and reminderDate should remain as strings since the schema expects date type
     };
     
     const newTask = await db.insert(maintenanceTasks).values(processedData).returning();
@@ -100,13 +100,9 @@ export const updateMaintenanceTask = async (req: Request, res: Response, next: N
     const { id } = req.params;
     const updateData = req.body;
     
+    // Keep dates as strings if they exist, don't convert to Date objects
     const processedData: any = { ...updateData };
-    if (updateData.date) {
-      processedData.date = new Date(updateData.date);
-    }
-    if (updateData.reminderDate) {
-      processedData.reminderDate = new Date(updateData.reminderDate);
-    }
+    // date and reminderDate should remain as strings since the schema expects date type
     
     const updatedTask = await db.update(maintenanceTasks)
       .set(processedData)

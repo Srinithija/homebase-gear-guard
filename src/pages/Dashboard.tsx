@@ -14,8 +14,20 @@ const Dashboard = () => {
   const [maintenanceTasks, setMaintenanceTasks] = useState<MaintenanceTask[]>([]);
 
   useEffect(() => {
-    setAppliances(getAppliances());
-    setMaintenanceTasks(getMaintenanceTasks());
+    const loadDashboardData = async () => {
+      try {
+        const [loadedAppliances, loadedMaintenanceTasks] = await Promise.all([
+          getAppliances(),
+          getMaintenanceTasks()
+        ]);
+        setAppliances(loadedAppliances);
+        setMaintenanceTasks(loadedMaintenanceTasks);
+      } catch (error) {
+        console.error('Failed to load dashboard data:', error);
+      }
+    };
+
+    loadDashboardData();
   }, []);
 
   const warrantyStats = {

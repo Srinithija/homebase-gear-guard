@@ -51,13 +51,13 @@ const AddContactDialog = ({ open, onOpenChange, applianceId, onSuccess }: AddCon
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
 
     try {
-      addContact({
+      await addContact({
         applianceId,
         contactName: formData.contactName,
         phone: formData.phone || undefined,
@@ -82,6 +82,7 @@ const AddContactDialog = ({ open, onOpenChange, applianceId, onSuccess }: AddCon
       onSuccess();
       onOpenChange(false);
     } catch (error) {
+      console.error('Failed to add contact:', error);
       toast({
         title: "Error",
         description: "Failed to add contact.",

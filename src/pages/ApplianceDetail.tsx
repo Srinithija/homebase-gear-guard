@@ -26,53 +26,95 @@ const ApplianceDetail = () => {
   const [showContactDialog, setShowContactDialog] = useState(false);
 
   useEffect(() => {
-    if (!id) return;
-    
-    const appliances = getAppliances();
-    const foundAppliance = appliances.find(a => a.id === id);
-    
-    if (!foundAppliance) {
-      navigate('/appliances');
-      return;
-    }
-    
-    setAppliance(foundAppliance);
-    
-    const tasks = getMaintenanceTasks().filter(t => t.applianceId === id);
-    setMaintenanceTasks(tasks);
-    
-    const applianceContacts = getContacts().filter(c => c.applianceId === id);
-    setContacts(applianceContacts);
-  }, [id, navigate]);
+    const loadApplianceData = async () => {
+      if (!id) return;
+      
+      try {
+        const appliances = await getAppliances();
+        const foundAppliance = appliances.find(a => a.id === id);
+        
+        if (!foundAppliance) {
+          navigate('/appliances');
+          return;
+        }
+        
+        setAppliance(foundAppliance);
+        
+        const [tasks, applianceContacts] = await Promise.all([
+          getMaintenanceTasks(),
+          getContacts()
+        ]);
+        
+        setMaintenanceTasks(tasks.filter(t => t.applianceId === id));
+        setContacts(applianceContacts.filter(c => c.applianceId === id));
+      } catch (error) {
+        console.error('Failed to load appliance data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load appliance data.",
+          variant: "destructive",
+        });
+      }
+    };
 
-  const handleDelete = () => {
+    loadApplianceData();
+  }, [id, navigate, toast]);
+
+  const handleDelete = async () => {
     if (!appliance) return;
     
     if (window.confirm(`Are you sure you want to delete "${appliance.name}"? This will also delete all associated maintenance tasks and contacts.`)) {
-      deleteAppliance(appliance.id);
-      toast({
-        title: "Appliance deleted",
-        description: `${appliance.name} has been successfully deleted.`,
-      });
-      navigate('/appliances');
+      try {
+        await deleteAppliance(appliance.id);
+        toast({
+          title: "Appliance deleted",
+          description: `${appliance.name} has been successfully deleted.`,
+        });
+        navigate('/appliances');
+      } catch (error) {
+        console.error('Failed to delete appliance:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete appliance.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
-  const handleTaskComplete = (taskId: string, completed: boolean) => {
-    updateMaintenanceTask(taskId, { completed });
-    setMaintenanceTasks(getMaintenanceTasks().filter(t => t.applianceId === id));
-    toast({
-      title: completed ? "Task completed" : "Task marked as pending",
-      description: "Maintenance task status updated.",
-    });
+  const handleTaskComplete = async (taskId: string, completed: boolean) => {
+    try {
+      await updateMaintenanceTask(taskId, { completed });
+      if (id) {
+        const tasks = await getMaintenanceTasks();
+        setMaintenanceTasks(tasks.filter(t => t.applianceId === id));
+      }
+      toast({
+        title: completed ? "Task completed" : "Task marked as pending",
+        description: "Maintenance task status updated.",
+      });
+    } catch (error) {
+      console.error('Failed to update maintenance task:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update maintenance task.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const refreshData = () => {
+  const refreshData = async () => {
     if (!id) return;
-    const tasks = getMaintenanceTasks().filter(t => t.applianceId === id);
-    setMaintenanceTasks(tasks);
-    const applianceContacts = getContacts().filter(c => c.applianceId === id);
-    setContacts(applianceContacts);
+    try {
+      const [tasks, applianceContacts] = await Promise.all([
+        getMaintenanceTasks(),
+        getContacts()
+      ]);
+      setMaintenanceTasks(tasks.filter(t => t.applianceId === id));
+      setContacts(applianceContacts.filter(c => c.applianceId === id));
+    } catch (error) {
+      console.error('Failed to refresh data:', error);
+    }
   };
 
   if (!appliance) {

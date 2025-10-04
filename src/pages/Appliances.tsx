@@ -20,9 +20,22 @@ const Appliances = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    const loadedAppliances = getAppliances();
-    setAppliances(loadedAppliances);
-    setFilteredAppliances(loadedAppliances);
+    const loadAppliances = async () => {
+      try {
+        const loadedAppliances = await getAppliances();
+        setAppliances(loadedAppliances);
+        setFilteredAppliances(loadedAppliances);
+      } catch (error) {
+        console.error('Failed to load appliances:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load appliances.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    loadAppliances();
   }, []);
 
   useEffect(() => {
@@ -44,14 +57,24 @@ const Appliances = () => {
     setFilteredAppliances(filtered);
   }, [appliances, searchTerm, filterStatus]);
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
     if (window.confirm(`Are you sure you want to delete "${name}"? This will also delete all associated maintenance tasks and contacts.`)) {
-      deleteAppliance(id);
-      setAppliances(getAppliances());
-      toast({
-        title: "Appliance deleted",
-        description: `${name} has been successfully deleted.`,
-      });
+      try {
+        await deleteAppliance(id);
+        const updatedAppliances = await getAppliances();
+        setAppliances(updatedAppliances);
+        toast({
+          title: "Appliance deleted",
+          description: `${name} has been successfully deleted.`,
+        });
+      } catch (error) {
+        console.error('Failed to delete appliance:', error);
+        toast({
+          title: "Error",
+          description: "Failed to delete appliance.",
+          variant: "destructive",
+        });
+      }
     }
   };
 

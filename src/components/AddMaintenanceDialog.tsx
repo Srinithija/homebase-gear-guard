@@ -53,7 +53,7 @@ const AddMaintenanceDialog = ({ open, onOpenChange, applianceId, onSuccess }: Ad
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     if (!validateForm()) return;
@@ -61,7 +61,7 @@ const AddMaintenanceDialog = ({ open, onOpenChange, applianceId, onSuccess }: Ad
     const reminderDate = calculateReminderDate(formData.date, formData.frequency);
     
     try {
-      addMaintenanceTask({
+      await addMaintenanceTask({
         applianceId,
         taskName: formData.taskName,
         date: formData.date,
@@ -90,6 +90,7 @@ const AddMaintenanceDialog = ({ open, onOpenChange, applianceId, onSuccess }: Ad
       onSuccess();
       onOpenChange(false);
     } catch (error) {
+      console.error('Failed to add maintenance task:', error);
       toast({
         title: "Error",
         description: "Failed to add maintenance task.",

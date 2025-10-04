@@ -1,21 +1,59 @@
 import { Appliance, MaintenanceTask, Contact } from '@/types/appliance';
+import { Appliance, MaintenanceTask, Contact } from '@/types/appliance';
+import { apiClient } from './api';
 
+// Fallback localStorage functions (for development/offline mode)
 const APPLIANCES_KEY = 'homebase_appliances';
 const MAINTENANCE_KEY = 'homebase_maintenance';
 const CONTACTS_KEY = 'homebase_contacts';
 
+// Check if we should use API or localStorage
+const useAPI = true; // Set to false for offline development
+
 // Appliance storage functions
-export const getAppliances = (): Appliance[] => {
-  const data = localStorage.getItem(APPLIANCES_KEY);
-  return data ? JSON.parse(data) : [];
+export const getAppliances = async (): Promise<Appliance[]> => {
+  if (useAPI) {
+    try {
+      console.log('🔄 Fetching appliances from API...');
+      const result = await apiClient.get<Appliance[]>('/appliances');
+      console.log('✅ API call successful:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Failed to fetch appliances from API:', error);
+      // Instead of falling back to localStorage, throw the error to debug
+      throw new Error(`API call failed: ${error.message}`);
+    }
+  } else {
+    const data = localStorage.getItem(APPLIANCES_KEY);
+    return data ? JSON.parse(data) : [];
+  }
 };
 
 export const saveAppliances = (appliances: Appliance[]): void => {
-  localStorage.setItem(APPLIANCES_KEY, JSON.stringify(appliances));
+  if (!useAPI) {
+    localStorage.setItem(APPLIANCES_KEY, JSON.stringify(appliances));
+  }
+  // When using API, this function is not needed as data is saved on server
 };
 
-export const addAppliance = (appliance: Omit<Appliance, 'id' | 'createdAt' | 'updatedAt'>): Appliance => {
-  const appliances = getAppliances();
+export const addAppliance = async (appliance: Omit<Appliance, 'id' | 'createdAt' | 'updatedAt'>): Promise<Appliance> => {
+  if (useAPI) {
+    try {
+      return await apiClient.post<Appliance>('/appliances', appliance);
+    } catch (error) {
+      console.error('Failed to create appliance via API, falling back to localStorage:', error);
+      // Fallback to localStorage
+      return addApplianceLocal(appliance);
+    }
+  } else {
+    return addApplianceLocal(appliance);
+  }
+};
+
+// Local localStorage version for fallback
+const addApplianceLocal = (appliance: Omit<Appliance, 'id' | 'createdAt' | 'updatedAt'>): Appliance => {
+  const data = localStorage.getItem(APPLIANCES_KEY);
+  const appliances = data ? JSON.parse(data) : [];
   const newAppliance: Appliance = {
     ...appliance,
     id: crypto.randomUUID(),
@@ -23,102 +61,268 @@ export const addAppliance = (appliance: Omit<Appliance, 'id' | 'createdAt' | 'up
     updatedAt: new Date().toISOString(),
   };
   appliances.push(newAppliance);
-  saveAppliances(appliances);
+  localStorage.setItem(APPLIANCES_KEY, JSON.stringify(appliances));
   return newAppliance;
 };
 
-export const updateAppliance = (id: string, updates: Partial<Appliance>): Appliance | null => {
-  const appliances = getAppliances();
-  const index = appliances.findIndex(a => a.id === id);
+export const updateAppliance = async (id: string, updates: Partial<Appliance>): Promise<Appliance | null> => {
+  if (useAPI) {
+    try {
+      return await apiClient.put<Appliance>(`/appliances/${id}`, updates);
+    } catch (error) {
+      console.error('Failed to update appliance via API, falling back to localStorage:', error);
+      // Fallback to localStorage
+      return updateApplianceLocal(id, updates);
+    }
+  } else {
+    return updateApplianceLocal(id, updates);
+  }
+};
+
+// Local localStorage version for fallback
+const updateApplianceLocal = (id: string, updates: Partial<Appliance>): Appliance | null => {
+  const data = localStorage.getItem(APPLIANCES_KEY);
+  const appliances = data ? JSON.parse(data) : [];
+  const index = appliances.findIndex((a: Appliance) => a.id === id);
   if (index === -1) return null;
   
   appliances[index] = { ...appliances[index], ...updates, updatedAt: new Date().toISOString() };
-  saveAppliances(appliances);
+  localStorage.setItem(APPLIANCES_KEY, JSON.stringify(appliances));
   return appliances[index];
 };
 
-export const deleteAppliance = (id: string): void => {
-  const appliances = getAppliances().filter(a => a.id !== id);
-  saveAppliances(appliances);
+export const deleteAppliance = async (id: string): Promise<void> => {
+  if (useAPI) {
+    try {
+      await apiClient.delete(`/appliances/${id}`);
+      return;
+    } catch (error) {
+      console.error('Failed to delete appliance via API, falling back to localStorage:', error);
+      // Fallback to localStorage
+      deleteApplianceLocal(id);
+    }
+  } else {
+    deleteApplianceLocal(id);
+  }
+};
+
+// Local localStorage version for fallback
+const deleteApplianceLocal = (id: string): void => {
+  const data = localStorage.getItem(APPLIANCES_KEY);
+  const appliances = data ? JSON.parse(data) : [];
+  const filteredAppliances = appliances.filter((a: Appliance) => a.id !== id);
+  localStorage.setItem(APPLIANCES_KEY, JSON.stringify(filteredAppliances));
   
   // Also delete related maintenance tasks and contacts
-  const maintenance = getMaintenanceTasks().filter(m => m.applianceId !== id);
-  saveMaintenanceTasks(maintenance);
+  const maintenanceData = localStorage.getItem(MAINTENANCE_KEY);
+  const maintenance = maintenanceData ? JSON.parse(maintenanceData) : [];
+  const filteredMaintenance = maintenance.filter((m: MaintenanceTask) => m.applianceId !== id);
+  localStorage.setItem(MAINTENANCE_KEY, JSON.stringify(filteredMaintenance));
   
-  const contacts = getContacts().filter(c => c.applianceId !== id);
-  saveContacts(contacts);
+  const contactsData = localStorage.getItem(CONTACTS_KEY);
+  const contacts = contactsData ? JSON.parse(contactsData) : [];
+  const filteredContacts = contacts.filter((c: Contact) => c.applianceId !== id);
+  localStorage.setItem(CONTACTS_KEY, JSON.stringify(filteredContacts));
 };
 
 // Maintenance task storage functions
-export const getMaintenanceTasks = (): MaintenanceTask[] => {
-  const data = localStorage.getItem(MAINTENANCE_KEY);
-  return data ? JSON.parse(data) : [];
+export const getMaintenanceTasks = async (): Promise<MaintenanceTask[]> => {
+  if (useAPI) {
+    try {
+      return await apiClient.get<MaintenanceTask[]>('/maintenance');
+    } catch (error) {
+      console.error('Failed to fetch maintenance tasks from API, falling back to localStorage:', error);
+      // Fallback to localStorage
+      const data = localStorage.getItem(MAINTENANCE_KEY);
+      return data ? JSON.parse(data) : [];
+    }
+  } else {
+    const data = localStorage.getItem(MAINTENANCE_KEY);
+    return data ? JSON.parse(data) : [];
+  }
 };
 
 export const saveMaintenanceTasks = (tasks: MaintenanceTask[]): void => {
-  localStorage.setItem(MAINTENANCE_KEY, JSON.stringify(tasks));
+  if (!useAPI) {
+    localStorage.setItem(MAINTENANCE_KEY, JSON.stringify(tasks));
+  }
+  // When using API, this function is not needed as data is saved on server
 };
 
-export const addMaintenanceTask = (task: Omit<MaintenanceTask, 'id' | 'createdAt'>): MaintenanceTask => {
-  const tasks = getMaintenanceTasks();
+export const addMaintenanceTask = async (task: Omit<MaintenanceTask, 'id' | 'createdAt'>): Promise<MaintenanceTask> => {
+  if (useAPI) {
+    try {
+      return await apiClient.post<MaintenanceTask>('/maintenance', task);
+    } catch (error) {
+      console.error('Failed to create maintenance task via API, falling back to localStorage:', error);
+      // Fallback to localStorage
+      return addMaintenanceTaskLocal(task);
+    }
+  } else {
+    return addMaintenanceTaskLocal(task);
+  }
+};
+
+// Local localStorage version for fallback
+const addMaintenanceTaskLocal = (task: Omit<MaintenanceTask, 'id' | 'createdAt'>): MaintenanceTask => {
+  const data = localStorage.getItem(MAINTENANCE_KEY);
+  const tasks = data ? JSON.parse(data) : [];
   const newTask: MaintenanceTask = {
     ...task,
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
   };
   tasks.push(newTask);
-  saveMaintenanceTasks(tasks);
+  localStorage.setItem(MAINTENANCE_KEY, JSON.stringify(tasks));
   return newTask;
 };
 
-export const updateMaintenanceTask = (id: string, updates: Partial<MaintenanceTask>): MaintenanceTask | null => {
-  const tasks = getMaintenanceTasks();
+export const updateMaintenanceTask = async (id: string, updates: Partial<MaintenanceTask>): Promise<MaintenanceTask | null> => {
+  if (useAPI) {
+    try {
+      return await apiClient.put<MaintenanceTask>(`/maintenance/${id}`, updates);
+    } catch (error) {
+      console.error('Failed to update maintenance task via API, falling back to localStorage:', error);
+      // Fallback to localStorage
+      return updateMaintenanceTaskLocal(id, updates);
+    }
+  } else {
+    return updateMaintenanceTaskLocal(id, updates);
+  }
+};
+
+// Local localStorage version for fallback
+const updateMaintenanceTaskLocal = (id: string, updates: Partial<MaintenanceTask>): MaintenanceTask | null => {
+  const data = localStorage.getItem(MAINTENANCE_KEY);
+  const tasks = data ? JSON.parse(data) : [];
   const index = tasks.findIndex(t => t.id === id);
   if (index === -1) return null;
   
   tasks[index] = { ...tasks[index], ...updates };
-  saveMaintenanceTasks(tasks);
+  localStorage.setItem(MAINTENANCE_KEY, JSON.stringify(tasks));
   return tasks[index];
 };
 
-export const deleteMaintenanceTask = (id: string): void => {
-  const tasks = getMaintenanceTasks().filter(t => t.id !== id);
-  saveMaintenanceTasks(tasks);
+export const deleteMaintenanceTask = async (id: string): Promise<void> => {
+  if (useAPI) {
+    try {
+      await apiClient.delete(`/maintenance/${id}`);
+      return;
+    } catch (error) {
+      console.error('Failed to delete maintenance task via API, falling back to localStorage:', error);
+      // Fallback to localStorage
+      deleteMaintenanceTaskLocal(id);
+    }
+  } else {
+    deleteMaintenanceTaskLocal(id);
+  }
+};
+
+// Local localStorage version for fallback
+const deleteMaintenanceTaskLocal = (id: string): void => {
+  const data = localStorage.getItem(MAINTENANCE_KEY);
+  const tasks = data ? JSON.parse(data) : [];
+  const filteredTasks = tasks.filter(t => t.id !== id);
+  localStorage.setItem(MAINTENANCE_KEY, JSON.stringify(filteredTasks));
 };
 
 // Contact storage functions
-export const getContacts = (): Contact[] => {
-  const data = localStorage.getItem(CONTACTS_KEY);
-  return data ? JSON.parse(data) : [];
+export const getContacts = async (): Promise<Contact[]> => {
+  if (useAPI) {
+    try {
+      return await apiClient.get<Contact[]>('/contacts');
+    } catch (error) {
+      console.error('Failed to fetch contacts from API, falling back to localStorage:', error);
+      // Fallback to localStorage
+      const data = localStorage.getItem(CONTACTS_KEY);
+      return data ? JSON.parse(data) : [];
+    }
+  } else {
+    const data = localStorage.getItem(CONTACTS_KEY);
+    return data ? JSON.parse(data) : [];
+  }
 };
 
 export const saveContacts = (contacts: Contact[]): void => {
-  localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
+  if (!useAPI) {
+    localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
+  }
+  // When using API, this function is not needed as data is saved on server
 };
 
-export const addContact = (contact: Omit<Contact, 'id' | 'createdAt'>): Contact => {
-  const contacts = getContacts();
+export const addContact = async (contact: Omit<Contact, 'id' | 'createdAt'>): Promise<Contact> => {
+  if (useAPI) {
+    try {
+      return await apiClient.post<Contact>('/contacts', contact);
+    } catch (error) {
+      console.error('Failed to create contact via API, falling back to localStorage:', error);
+      // Fallback to localStorage
+      return addContactLocal(contact);
+    }
+  } else {
+    return addContactLocal(contact);
+  }
+};
+
+// Local localStorage version for fallback
+const addContactLocal = (contact: Omit<Contact, 'id' | 'createdAt'>): Contact => {
+  const data = localStorage.getItem(CONTACTS_KEY);
+  const contacts = data ? JSON.parse(data) : [];
   const newContact: Contact = {
     ...contact,
     id: crypto.randomUUID(),
     createdAt: new Date().toISOString(),
   };
   contacts.push(newContact);
-  saveContacts(contacts);
+  localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
   return newContact;
 };
 
-export const updateContact = (id: string, updates: Partial<Contact>): Contact | null => {
-  const contacts = getContacts();
+export const updateContact = async (id: string, updates: Partial<Contact>): Promise<Contact | null> => {
+  if (useAPI) {
+    try {
+      return await apiClient.put<Contact>(`/contacts/${id}`, updates);
+    } catch (error) {
+      console.error('Failed to update contact via API, falling back to localStorage:', error);
+      // Fallback to localStorage
+      return updateContactLocal(id, updates);
+    }
+  } else {
+    return updateContactLocal(id, updates);
+  }
+};
+
+// Local localStorage version for fallback
+const updateContactLocal = (id: string, updates: Partial<Contact>): Contact | null => {
+  const data = localStorage.getItem(CONTACTS_KEY);
+  const contacts = data ? JSON.parse(data) : [];
   const index = contacts.findIndex(c => c.id === id);
   if (index === -1) return null;
   
   contacts[index] = { ...contacts[index], ...updates };
-  saveContacts(contacts);
+  localStorage.setItem(CONTACTS_KEY, JSON.stringify(contacts));
   return contacts[index];
 };
 
-export const deleteContact = (id: string): void => {
-  const contacts = getContacts().filter(c => c.id !== id);
-  saveContacts(contacts);
+export const deleteContact = async (id: string): Promise<void> => {
+  if (useAPI) {
+    try {
+      await apiClient.delete(`/contacts/${id}`);
+      return;
+    } catch (error) {
+      console.error('Failed to delete contact via API, falling back to localStorage:', error);
+      // Fallback to localStorage
+      deleteContactLocal(id);
+    }
+  } else {
+    deleteContactLocal(id);
+  }
+};
+
+// Local localStorage version for fallback
+const deleteContactLocal = (id: string): void => {
+  const data = localStorage.getItem(CONTACTS_KEY);
+  const contacts = data ? JSON.parse(data) : [];
+  const filteredContacts = contacts.filter(c => c.id !== id);
+  localStorage.setItem(CONTACTS_KEY, JSON.stringify(filteredContacts));
 };
