@@ -9,6 +9,16 @@ const CONTACTS_KEY = 'homebase_contacts';
 // Check if we should use API or localStorage
 const useAPI = true; // Set to false for offline development
 
+// Helper function to check if error is a Supabase connection issue
+const isSupabaseConnectionError = (error: any): boolean => {
+  if (!error || typeof error !== 'object') return false;
+  const message = error.message || '';
+  return message.includes('Tenant or user not found') || 
+         message.includes('ENETUNREACH') || 
+         message.includes('connection refused') ||
+         message.includes('timeout');
+};
+
 // Appliance storage functions
 export const getAppliances = async (): Promise<Appliance[]> => {
   if (useAPI) {
@@ -19,7 +29,13 @@ export const getAppliances = async (): Promise<Appliance[]> => {
       return result;
     } catch (error) {
       console.error('❌ Failed to fetch appliances from API:', error);
-      // Instead of falling back to localStorage, throw the error to debug
+      
+      // If it's a Supabase connection error, provide specific guidance
+      if (isSupabaseConnectionError(error)) {
+        throw new Error('🚨 Database temporarily unavailable - Supabase project may be paused. Please check: https://app.supabase.com/project/llwasxekjvvezufpyolq');
+      }
+      
+      // For other errors, provide general error message
       throw new Error(`API call failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   } else {
@@ -40,8 +56,15 @@ export const addAppliance = async (appliance: Omit<Appliance, 'id' | 'createdAt'
     try {
       return await apiClient.post<Appliance>('/appliances', appliance);
     } catch (error) {
-      console.error('Failed to create appliance via API, falling back to localStorage:', error);
-      // Fallback to localStorage
+      console.error('Failed to create appliance via API:', error);
+      
+      // If it's a Supabase connection error, throw specific error
+      if (isSupabaseConnectionError(error)) {
+        throw new Error('🚨 Cannot save data - Database temporarily unavailable. Supabase project may be paused. Please check: https://app.supabase.com/project/llwasxekjvvezufpyolq');
+      }
+      
+      // For other errors, fall back to localStorage
+      console.warn('Falling back to localStorage due to API error');
       return addApplianceLocal(appliance);
     }
   } else {

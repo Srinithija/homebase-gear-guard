@@ -5,6 +5,30 @@ import { appliances, maintenanceTasks, contacts } from '../db/schema';
 import { successResponse, errorResponse } from '../utils/responses';
 import { FilterParams, ApplianceStats } from '../types';
 
+// Helper function to handle Supabase connection errors
+const handleDatabaseError = (error: any, res: Response, fallbackData: any = null) => {
+  if (error && typeof error === 'object' && 'message' in error && 
+      (error.message as string).includes('Tenant or user not found')) {
+    return res.status(503).json({
+      success: false,
+      message: '🚨 Database temporarily unavailable - Supabase project may be paused',
+      data: fallbackData,
+      fallbackMode: true,
+      instructions: {
+        action: 'Resume Supabase Project',
+        url: 'https://app.supabase.com/project/llwasxekjvvezufpyolq',
+        steps: [
+          '1. Visit Supabase dashboard',
+          '2. Check if project is paused',
+          '3. Click "Resume" or upgrade plan',
+          '4. Refresh this page'
+        ]
+      }
+    });
+  }
+  return null;
+};
+
 export const getAppliances = async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { search, status } = req.query as FilterParams;
@@ -45,26 +69,10 @@ export const getAppliances = async (req: Request, res: Response, next: NextFunct
     
     return successResponse(res, filteredAppliances, 'Appliances retrieved successfully');
   } catch (error) {
-    // If database connection fails, return helpful message
-    if (error && typeof error === 'object' && 'message' in error && 
-        (error.message as string).includes('Tenant or user not found')) {
-      return res.status(503).json({
-        success: false,
-        message: '🚨 Database temporarily unavailable - Supabase project may be paused',
-        data: [],
-        fallbackMode: true,
-        instructions: {
-          action: 'Resume Supabase Project',
-          url: 'https://app.supabase.com/project/llwasxekjvvezufpyolq',
-          steps: [
-            '1. Visit Supabase dashboard',
-            '2. Check if project is paused',
-            '3. Click "Resume" or upgrade plan',
-            '4. Refresh this page'
-          ]
-        }
-      });
-    }
+    // Handle database connection issues
+    const handled = handleDatabaseError(error, res, []);
+    if (handled) return handled;
+    
     next(error);
   }
 };
@@ -96,6 +104,10 @@ export const getApplianceById = async (req: Request, res: Response, next: NextFu
     
     return successResponse(res, result, 'Appliance retrieved successfully');
   } catch (error) {
+    // Handle database connection issues
+    const handled = handleDatabaseError(error, res, null);
+    if (handled) return handled;
+    
     next(error);
   }
 };
@@ -113,6 +125,10 @@ export const createAppliance = async (req: Request, res: Response, next: NextFun
     
     return successResponse(res, newAppliance[0], 'Appliance created successfully', 201);
   } catch (error) {
+    // Handle database connection issues
+    const handled = handleDatabaseError(error, res, null);
+    if (handled) return handled;
+    
     next(error);
   }
 };
@@ -137,6 +153,10 @@ export const updateAppliance = async (req: Request, res: Response, next: NextFun
     
     return successResponse(res, updatedAppliance[0], 'Appliance updated successfully');
   } catch (error) {
+    // Handle database connection issues
+    const handled = handleDatabaseError(error, res, null);
+    if (handled) return handled;
+    
     next(error);
   }
 };
@@ -155,6 +175,10 @@ export const deleteAppliance = async (req: Request, res: Response, next: NextFun
     
     return successResponse(res, null, 'Appliance deleted successfully');
   } catch (error) {
+    // Handle database connection issues
+    const handled = handleDatabaseError(error, res, null);
+    if (handled) return handled;
+    
     next(error);
   }
 };
@@ -179,6 +203,11 @@ export const getApplianceStats = async (req: Request, res: Response, next: NextF
     
     return successResponse(res, stats, 'Statistics retrieved successfully');
   } catch (error) {
+    // Handle database connection issues with fallback stats
+    const fallbackStats = { total: 0, active: 0, expiringSoon: 0, expired: 0 };
+    const handled = handleDatabaseError(error, res, fallbackStats);
+    if (handled) return handled;
+    
     next(error);
   }
 };

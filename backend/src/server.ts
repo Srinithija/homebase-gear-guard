@@ -33,24 +33,45 @@ app.get('/health', async (req, res) => {
     // Quick database connection test
     const dbConnected = await testConnection();
     
-    res.json({ 
-      status: 'OK', 
-      timestamp: new Date().toISOString(),
-      environment: env.NODE_ENV,
-      database: dbConnected ? 'Connected' : 'Disconnected - Using Fallback Mode',
-      fallbackMode: !dbConnected,
-      version: '1.0.0',
-      message: dbConnected ? 'All systems operational' : '⚠️ Database unavailable - App running in fallback mode. Check Supabase project status.'
-    });
+    if (dbConnected) {
+      res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        environment: env.NODE_ENV,
+        database: 'Connected',
+        fallbackMode: false,
+        version: '1.0.0',
+        message: 'All systems operational'
+      });
+    } else {
+      // Database disconnected but app is still functional
+      res.status(200).json({ 
+        status: 'DEGRADED', 
+        timestamp: new Date().toISOString(),
+        environment: env.NODE_ENV,
+        database: 'Disconnected - Using Fallback Mode',
+        fallbackMode: true,
+        version: '1.0.0',
+        message: '⚠️ Database unavailable - App running in fallback mode. Check Supabase project status.',
+        instructions: {
+          action: 'Check Supabase Dashboard',
+          url: 'https://app.supabase.com/project/llwasxekjvvezufpyolq'
+        }
+      });
+    }
   } catch (error) {
-    res.status(200).json({ // Changed from 503 to 200 to keep app healthy
+    res.status(200).json({ // Keep 200 to indicate app is still running
       status: 'FALLBACK', 
       timestamp: new Date().toISOString(),
       environment: env.NODE_ENV,
       database: 'Error - Fallback Mode Active',
       fallbackMode: true,
       error: error instanceof Error ? error.message : 'Unknown error',
-      message: '🚨 Database connection failed - App running in fallback mode'
+      message: '🚨 Database connection failed - App running in fallback mode',
+      instructions: {
+        action: 'Resume Supabase Project',
+        url: 'https://app.supabase.com/project/llwasxekjvvezufpyolq'
+      }
     });
   }
 });
