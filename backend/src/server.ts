@@ -27,13 +27,28 @@ app.use(express.urlencoded({ extended: true }));
 // API Routes
 app.use('/api', routes);
 
-// Health check
-app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    environment: env.NODE_ENV,
-  });
+// Health check with database status
+app.get('/health', async (req, res) => {
+  try {
+    // Quick database connection test
+    const dbConnected = await testConnection();
+    
+    res.json({ 
+      status: 'OK', 
+      timestamp: new Date().toISOString(),
+      environment: env.NODE_ENV,
+      database: dbConnected ? 'Connected' : 'Disconnected',
+      version: '1.0.0'
+    });
+  } catch (error) {
+    res.status(503).json({ 
+      status: 'ERROR', 
+      timestamp: new Date().toISOString(),
+      environment: env.NODE_ENV,
+      database: 'Error',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
+  }
 });
 
 // Serve static files in production
@@ -54,14 +69,13 @@ app.use(errorHandler);
 
 const PORT = env.PORT || 3001;
 
-// Start server with database connection test
+// Start server with optional database connection test
 const startServer = async () => {
   try {
-    // Test database connection
+    // Test database connection (don't exit if it fails)
     const dbConnected = await testConnection();
     if (!dbConnected) {
-      console.error('❌ Failed to connect to database. Exiting...');
-      process.exit(1);
+      console.warn('⚠️ Database connection failed - app will still start for debugging');
     }
 
     app.listen(PORT, () => {
@@ -70,6 +84,10 @@ const startServer = async () => {
       console.log(`🌐 CORS Origin: ${env.CORS_ORIGIN}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
       console.log(`📡 API Base URL: http://localhost:${PORT}/api`);
+      
+      if (!dbConnected) {
+        console.log('🔧 Database connection issues detected. Check logs above.');
+      }
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
