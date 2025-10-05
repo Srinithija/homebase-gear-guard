@@ -40,9 +40,13 @@ export const FallbackModeNotification: React.FC<FallbackModeNotificationProps> =
         <AlertTriangle className="h-4 w-4" />
         <AlertDescription className="flex items-center justify-between w-full">
           <div className="flex-1">
-            <p className="font-medium">📱 Offline Mode Active</p>
+            <p className="font-medium">💾 Offline Mode Active</p>
             <p className="text-sm mt-1">
-              Using local storage. Data will sync when connection is restored.
+              Database temporarily unavailable. Using local storage.
+              <br />
+              <span className="text-xs opacity-75">
+                Your data is safe and will sync when connection is restored.
+              </span>
             </p>
           </div>
           <div className="flex items-center gap-2 ml-4">
@@ -80,24 +84,54 @@ export const useFallbackMode = () => {
   const [isFallbackMode, setIsFallbackMode] = useState(false);
 
   useEffect(() => {
-    // Check if we're using localhost API in production (indicates fallback mode)
-    const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-    const apiUrl = import.meta.env.VITE_API_URL || 
-      (isDev ? 'http://localhost:3001/api' : 'https://homebase-gear-guard.onrender.com/api');
-    
-    const isInFallbackMode = !isDev && apiUrl.includes('localhost');
-    setIsFallbackMode(isInFallbackMode);
-
-    // Also listen for API errors that might indicate fallback mode
-    const handleError = (event: ErrorEvent) => {
-      if (event.message.includes('Content Security Policy') || 
-          event.message.includes('Failed to fetch')) {
-        setIsFallbackMode(true);
+    // Check multiple indicators of fallback mode
+    const checkFallbackMode = () => {
+      // Check if we're using localhost API in production (indicates fallback mode)
+      const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+      const apiUrl = import.meta.env.VITE_API_URL || 
+        (isDev ? 'http://localhost:3001/api' : 'https://homebase-gear-guard.onrender.com/api');
+      
+      const hasApiUrlIssue = !isDev && apiUrl.includes('localhost');
+      
+      // Check if API was recently marked as unavailable
+      const lastApiStatus = localStorage.getItem('homebase_api_status');
+      const recentApiFailure = lastApiStatus === 'unavailable';
+      
+      // Check if we have any data in localStorage (indicates fallback usage)
+      const hasLocalData = localStorage.getItem('homebase_appliances') || 
+                          localStorage.getItem('homebase_maintenance') || 
+                          localStorage.getItem('homebase_contacts');
+      
+      const isInFallbackMode = hasApiUrlIssue || recentApiFailure || (hasLocalData && !isDev);
+      setIsFallbackMode(isInFallbackMode);
+      
+      if (isInFallbackMode) {
+        console.log('💾 Fallback mode detected:', {
+          apiUrlIssue: hasApiUrlIssue,
+          recentFailure: recentApiFailure,
+          hasLocalData: !!hasLocalData
+        });
       }
     };
 
-    window.addEventListener('error', handleError);
-    return () => window.removeEventListener('error', handleError);
+    checkFallbackMode();
+    
+    // Re-check every 30 seconds
+    const interval = setInterval(checkFallbackMode, 30000);
+    
+    // Also listen for storage changes (when API failures are recorded)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'homebase_api_status') {
+        checkFallbackMode();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('storage', handleStorageChange);
+    };
   }, []);
 
   return isFallbackMode;

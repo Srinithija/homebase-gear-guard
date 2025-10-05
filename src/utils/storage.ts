@@ -7,14 +7,28 @@ const MAINTENANCE_KEY = 'homebase_maintenance';
 const CONTACTS_KEY = 'homebase_contacts';
 
 // Check if we should use API or localStorage
-// Set to false for immediate offline mode if API is failing
+// Enhanced logic to detect API unavailability and auto-fallback
 const useAPI = (() => {
   // Check if we're in development
   const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   
-  // Check for CSP/API connectivity issues
-  const hasAPIIssues = (() => {
+  // Check for immediate fallback triggers
+  const shouldUseFallback = (() => {
     try {
+      // Check if we've detected API issues recently
+      const lastApiCheck = localStorage.getItem('homebase_last_api_check');
+      const lastApiStatus = localStorage.getItem('homebase_api_status');
+      
+      if (lastApiCheck && lastApiStatus === 'unavailable') {
+        const checkTime = new Date(lastApiCheck);
+        const now = new Date();
+        // If API was unavailable in the last 5 minutes, stay in fallback mode
+        if ((now.getTime() - checkTime.getTime()) < 5 * 60 * 1000) {
+          console.log('💾 Recent API failure detected - staying in fallback mode');
+          return true;
+        }
+      }
+      
       // Quick check for obvious API URL issues
       const apiUrl = import.meta.env.VITE_API_URL || 
         (isDev ? 'http://localhost:3001/api' : 'https://homebase-gear-guard.onrender.com/api');
@@ -36,21 +50,21 @@ const useAPI = (() => {
     }
   })();
   
-  if (hasAPIIssues) {
-    console.log('💾 Using localStorage fallback mode due to API configuration issues');
+  if (shouldUseFallback) {
+    console.log('💾 Using localStorage fallback mode due to API issues');
     return false;
   }
   
-  console.log('🌐 Using API mode');
+  console.log('🌐 Attempting API mode with auto-fallback');
   return true;
 })();
 
-// Helper function to check if error is a Supabase connection issue or CSP violation
+// Helper function to check if error indicates API unavailability
 const isConnectionError = (error: any): boolean => {
   if (!error || typeof error !== 'object') return false;
   const message = error.message || '';
   
-  // Check for various connection issues
+  // Check for various connection issues including our enhanced error messages
   return message.includes('Tenant or user not found') || 
          message.includes('ENETUNREACH') || 
          message.includes('connection refused') ||
@@ -58,29 +72,55 @@ const isConnectionError = (error: any): boolean => {
          message.includes('Failed to fetch') ||
          message.includes('Content Security Policy') ||
          message.includes('CSP') ||
+         message.includes('503') ||
+         message.includes('Service Unavailable') ||
+         message.includes('Database unavailable') ||
          message.includes('violates the following Content Security Policy directive');
 };
 
-// Appliance storage functions
+// Function to record API failure and switch to fallback mode
+const recordApiFailure = () => {
+  localStorage.setItem('homebase_last_api_check', new Date().toISOString());
+  localStorage.setItem('homebase_api_status', 'unavailable');
+  console.log('💾 API failure recorded - switching to localStorage mode');
+};
+
+// Function to record API success
+const recordApiSuccess = () => {
+  localStorage.setItem('homebase_last_api_check', new Date().toISOString());
+  localStorage.setItem('homebase_api_status', 'available');
+  console.log('✅ API success recorded');
+};
+
+// Appliance storage functions with enhanced fallback
 export const getAppliances = async (): Promise<Appliance[]> => {
   if (useAPI) {
     try {
       console.log('🔄 Fetching appliances from API...');
       const result = await apiClient.get<Appliance[]>('/appliances');
       console.log('✅ API call successful:', result);
+      recordApiSuccess();
       return result;
     } catch (error) {
       console.error('❌ Failed to fetch appliances from API:', error);
       
-      // If it's a connection error (including CSP violations), provide specific guidance
+      // Record API failure for future fallback decisions
+      recordApiFailure();
+      
+      // If it's a connection error, provide specific guidance and fallback
       if (isConnectionError(error)) {
-        throw new Error('🚨 Connection failed - Using localStorage mode. Check: API configuration or database availability');
+        console.log('💾 API unavailable - falling back to localStorage automatically');
+        const localData = localStorage.getItem(APPLIANCES_KEY);
+        return localData ? JSON.parse(localData) : [];
       }
       
-      // For other errors, provide general error message
-      throw new Error(`API call failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      // For other errors, provide general error message and fallback
+      console.log('💾 Unknown API error - falling back to localStorage');
+      const localData = localStorage.getItem(APPLIANCES_KEY);
+      return localData ? JSON.parse(localData) : [];
     }
   } else {
+    console.log('💾 Using localStorage mode');
     const data = localStorage.getItem(APPLIANCES_KEY);
     return data ? JSON.parse(data) : [];
   }
@@ -189,18 +229,27 @@ const deleteApplianceLocal = (id: string): void => {
   localStorage.setItem(CONTACTS_KEY, JSON.stringify(filteredContacts));
 };
 
-// Maintenance task storage functions
+// Maintenance task storage functions with enhanced fallback
 export const getMaintenanceTasks = async (): Promise<MaintenanceTask[]> => {
   if (useAPI) {
     try {
-      return await apiClient.get<MaintenanceTask[]>('/maintenance');
+      console.log('🔄 Fetching maintenance tasks from API...');
+      const result = await apiClient.get<MaintenanceTask[]>('/maintenance');
+      console.log('✅ Maintenance API call successful:', result);
+      recordApiSuccess();
+      return result;
     } catch (error) {
-      console.error('Failed to fetch maintenance tasks from API, falling back to localStorage:', error);
-      // Fallback to localStorage
+      console.error('❌ Failed to fetch maintenance tasks from API:', error);
+      
+      // Record API failure and fallback to localStorage
+      recordApiFailure();
+      
+      console.log('💾 Maintenance API unavailable - falling back to localStorage');
       const data = localStorage.getItem(MAINTENANCE_KEY);
       return data ? JSON.parse(data) : [];
     }
   } else {
+    console.log('💾 Using localStorage for maintenance tasks');
     const data = localStorage.getItem(MAINTENANCE_KEY);
     return data ? JSON.parse(data) : [];
   }
