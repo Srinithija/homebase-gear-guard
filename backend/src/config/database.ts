@@ -3,59 +3,58 @@ import postgres from 'postgres';
 import * as schema from '../db/schema';
 import { env } from './env';
 
-// Optimized connection configuration for cloud platforms - IPv4 only
+// Optimized connection configuration for Render deployment
 const connectionConfig = {
-  // Connection pool settings
-  max: 1, // Single connection for connection pooler
-  idle_timeout: 0, // Disable idle timeout for pooler
-  connect_timeout: 5, // Shorter timeout for faster failover
+  // Connection pool settings optimized for serverless
+  max: 1, // Single connection for pooler
+  idle_timeout: 20, // Allow some idle time for Render
+  connect_timeout: 10, // Reasonable timeout
   // SSL configuration for production
   ssl: env.NODE_ENV === 'production' ? 'require' as const : false,
-  // Disable prepared statements for pgbouncer compatibility
+  // Disable prepared statements for pooler compatibility
   prepare: false,
-  // Force IPv4 to avoid IPv6 connectivity issues
-  host_type: 'ipv4' as any,
   // Connection handling
   transform: {
     undefined: null
   },
-  // Additional IPv4 enforcement
-  options: {
-    'sslmode': 'require'
+  // Additional Render-specific options
+  connection: {
+    application_name: 'homebase-gear-guard-render'
   }
 };
 
-// Create connection with your exact Supabase pooler URLs (IPv4 compatible)
+// Create connection with your EXACT Supabase connection strings
 const createConnectionWithFallback = () => {
-  // EXACT URLs from your Supabase dashboard - IPv4 compatible poolers (FREE)
-  // Region: aws-1-ap-south-1, Password: Srinithija02
-  const yourSupabasePoolers = {
-    // Session pooler (port 6543) - IPv4 compatible, recommended for persistent connections
-    session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true',
-    // Transaction pooler (port 5432) - IPv4 compatible, recommended for serverless
-    transaction: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-1-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require'
+  // Your EXACT connection strings from Supabase dashboard
+  const exactSupabaseUrls = {
+    // Session pooler (port 6543) - IPv4 compatible, for persistent connections
+    session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-1-ap-south-1.pooler.supabase.com:6543/postgres',
+    // Transaction pooler (port 5432) - IPv4 compatible, for serverless/stateless apps
+    transaction: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-1-ap-south-1.pooler.supabase.com:5432/postgres',
+    // Direct connection (IPv6 - not compatible with Render) - for reference only
+    direct: 'postgresql://postgres:Srinithija02@db.llwasxekjvvezufpyolq.supabase.co:5432/postgres'
   };
   
-  // Priority order: Session pooler first (better for production apps)
+  // Priority order based on Render deployment memory guidelines
   const connectionUrls = [
-    // Primary: Session pooler (IPv4 compatible ✅)
-    yourSupabasePoolers.session,
-    // Secondary: Transaction pooler (IPv4 compatible ✅)
-    yourSupabasePoolers.transaction,
-    // Environment variables only if they contain 'pooler' (avoid direct connections)
-    process.env.DATABASE_URL && process.env.DATABASE_URL.includes('pooler') ? process.env.DATABASE_URL : null,
-    process.env.DATABASE_URL_POOLER_SESSION,
-    process.env.DATABASE_URL_FALLBACK && process.env.DATABASE_URL_FALLBACK.includes('pooler') ? process.env.DATABASE_URL_FALLBACK : null
+    // Primary: Transaction pooler (best for Render/serverless)
+    exactSupabaseUrls.transaction + '?sslmode=require&connect_timeout=10',
+    // Secondary: Session pooler (alternative)
+    exactSupabaseUrls.session + '?sslmode=require&connect_timeout=10',
+    // Environment variables as fallback
+    process.env.DATABASE_URL,
+    process.env.DATABASE_URL_FALLBACK,
+    process.env.DATABASE_URL_POOLER_SESSION
   ].filter(Boolean);
 
-  console.log('🔄 Creating database connection with your exact Supabase poolers...');
-  console.log('📍 Region: aws-1-ap-south-1 (IPv4 compatible)');
+  console.log('🔄 Creating database connection with EXACT Supabase URLs...');
+  console.log('📍 Region: aws-1-ap-south-1');
   console.log('📍 Primary URL:', connectionUrls[0]!.replace(/:[^:@]*@/, ':****@'));
-  console.log('✅ Session pooler connections are IPv4 proxied for free');
-  console.log('🚫 Direct connections disabled (requires IPv6 or $4/month)');
+  console.log('✅ Using IPv4-compatible poolers (FREE)');
+  console.log('🚫 Direct connection disabled (IPv6/expensive)');
   
   try {
-    // Use the primary pooler URL with optimized config
+    // Use the primary URL with optimized config for Render
     return postgres(connectionUrls[0]!, connectionConfig);
   } catch (error) {
     console.error('❌ Failed to create database connection:', error);
