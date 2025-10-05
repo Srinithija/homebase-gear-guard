@@ -71,3 +71,32 @@ Yes, you can!
 To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
 
 Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+
+## 🏠 Homebase Gear Guard - Project Information
+
+This is a home appliance management system built with React, Express.js, and PostgreSQL.
+
+### 🚀 Deployment
+
+**Render Deployment**: Configured for deployment on Render with automatic environment detection.
+
+**API Configuration**:
+- **Development**: `http://localhost:3001/api`
+- **Production**: `https://homebase-gear-guard.onrender.com/api`
+
+**Environment Variables**:
+- `VITE_API_URL`: Override the API base URL
+- `DATABASE_URL`: PostgreSQL connection string (Supabase)
+- `CORS_ORIGIN`: Allowed origins for CORS
+
+### 🛠️ Troubleshooting
+
+**Common Issues**:
+- **CSP Violations**: See `DEPLOYMENT_API_FIX.md`
+- **Database Connection**: See `TROUBLESHOOTING.md`
+- **RLS Security**: See `backend/RLS_FIX_GUIDE.md`
+
+**Quick Fixes**:
+1. **API Connection Issues**: Check if API URL is correct in browser console
+2. **Database Issues**: Verify Supabase project is not paused
+3. **Build Failures**: Check environment variables in render.yaml
