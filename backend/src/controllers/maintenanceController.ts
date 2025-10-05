@@ -1,5 +1,4 @@
 import { Request, Response, NextFunction } from 'express';
-import { Request, Response, NextFunction } from 'express';
 import { eq, desc, and, lte, gte, sql } from 'drizzle-orm';
 import { db, isDatabaseAvailable } from '../config/database';
 import { maintenanceTasks, appliances } from '../db/schema';
