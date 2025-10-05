@@ -25,44 +25,37 @@ const connectionConfig = {
   }
 };
 
-// Create connection with aggressive IPv4-only pooler strategy
+// Create connection with your exact Supabase pooler URLs (IPv4 compatible)
 const createConnectionWithFallback = () => {
-  // IPv4-only pooler URLs with CORRECT authentication format (dot format for poolers)
-  // Based on memory: Use 'postgres.{project_ref}' format for poolers
-  const ipv4PoolerUrls = {
-    // Transaction pooler with dot format (correct for poolers)
-    primary: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=5',
-    // Session pooler with dot format (most reliable for concurrent connections)
-    session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require&connect_timeout=5',
-    // Alternative transaction pooler (standard format as backup)
-    alt_primary: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=5',
-    // Alternative session pooler (standard format as backup)
-    alt_session: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require&connect_timeout=5'
+  // EXACT URLs from your Supabase dashboard - IPv4 compatible poolers (FREE)
+  // Region: aws-1-ap-south-1, Password: Srinithija02
+  const yourSupabasePoolers = {
+    // Session pooler (port 6543) - IPv4 compatible, recommended for persistent connections
+    session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require&pgbouncer=true',
+    // Transaction pooler (port 5432) - IPv4 compatible, recommended for serverless
+    transaction: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-1-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require'
   };
   
-  // Priority order: Use ONLY pooler URLs, never direct connections to avoid IPv6
+  // Priority order: Session pooler first (better for production apps)
   const connectionUrls = [
-    // Primary: Session pooler (best for production)
-    ipv4PoolerUrls.session,
-    // Secondary: Transaction pooler 
-    ipv4PoolerUrls.primary,
-    // Fallbacks with standard auth format
-    ipv4PoolerUrls.alt_session,
-    ipv4PoolerUrls.alt_primary,
-    // Environment variables only if they contain 'pooler'
+    // Primary: Session pooler (IPv4 compatible ✅)
+    yourSupabasePoolers.session,
+    // Secondary: Transaction pooler (IPv4 compatible ✅)
+    yourSupabasePoolers.transaction,
+    // Environment variables only if they contain 'pooler' (avoid direct connections)
     process.env.DATABASE_URL && process.env.DATABASE_URL.includes('pooler') ? process.env.DATABASE_URL : null,
     process.env.DATABASE_URL_POOLER_SESSION,
     process.env.DATABASE_URL_FALLBACK && process.env.DATABASE_URL_FALLBACK.includes('pooler') ? process.env.DATABASE_URL_FALLBACK : null
   ].filter(Boolean);
 
-  console.log('🔄 Creating database connection with IPv4-only poolers...');
-  console.log('📍 Total pooler options:', connectionUrls.length);
+  console.log('🔄 Creating database connection with your exact Supabase poolers...');
+  console.log('📍 Region: aws-1-ap-south-1 (IPv4 compatible)');
   console.log('📍 Primary URL:', connectionUrls[0]!.replace(/:[^:@]*@/, ':****@'));
-  console.log('🚫 Direct connections disabled - pooler-only strategy');
-  console.log('✅ Supabase project confirmed ACTIVE');
+  console.log('✅ Session pooler connections are IPv4 proxied for free');
+  console.log('🚫 Direct connections disabled (requires IPv6 or $4/month)');
   
   try {
-    // Use the primary pooler URL with IPv4-optimized config
+    // Use the primary pooler URL with optimized config
     return postgres(connectionUrls[0]!, connectionConfig);
   } catch (error) {
     console.error('❌ Failed to create database connection:', error);
@@ -105,29 +98,27 @@ export const isDatabaseAvailable = async (): Promise<boolean> => {
 
 // Enhanced connection test with better error handling
 export const testConnection = async () => {
-  // Try multiple username formats for better compatibility
+  // Your exact Supabase pooler URLs (IPv4 compatible)
   const fallbackUrls = {
-    pooler_dot_format: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
-    pooler_standard: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
-    pooler_session_dot: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
-    pooler_session_standard: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
-    direct_connection: 'postgresql://postgres:Srinithija02@db.llwasxekjvvezufpyolq.supabase.co:5432/postgres?sslmode=require'
+    pooler_dot_format: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-1-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
+    pooler_standard: 'postgresql://postgres:Srinithija02@aws-1-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
+    pooler_session_dot: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require',
+    pooler_session_standard: 'postgresql://postgres:Srinithija02@aws-1-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require'
   };
 
-  // Test multiple formats to find the working one
+  // Test your IPv4-compatible pooler URLs only (no direct connections)
   const connectionUrls = [
-    { name: 'Transaction Pooler (Dot Format)', url: fallbackUrls.pooler_dot_format },
-    { name: 'Transaction Pooler (Standard)', url: fallbackUrls.pooler_standard },
-    { name: 'Session Pooler (Dot Format)', url: fallbackUrls.pooler_session_dot },
-    { name: 'Session Pooler (Standard)', url: fallbackUrls.pooler_session_standard },
-    { name: 'Direct Connection (Test)', url: fallbackUrls.direct_connection }
+    { name: 'Session Pooler (IPv4 Compatible)', url: fallbackUrls.pooler_session_dot },
+    { name: 'Transaction Pooler (IPv4 Compatible)', url: fallbackUrls.pooler_dot_format },
+    { name: 'Session Pooler (Standard Format)', url: fallbackUrls.pooler_session_standard },
+    { name: 'Transaction Pooler (Standard Format)', url: fallbackUrls.pooler_standard }
   ];
 
-  console.log(`🔗 Testing ${connectionUrls.length} database connection options...`);
+  console.log(`🔗 Testing ${connectionUrls.length} IPv4-compatible pooler connections...`);
   console.log('📍 Diagnostic Information:');
   console.log('   Project Ref: llwasxekjvvezufpyolq');
   console.log('   Password: Srinithija02');
-  console.log('   Region: aws-0-ap-south-1');
+  console.log('   Region: aws-1-ap-south-1 (IPv4 compatible)');
   console.log('');
 
   for (const { name, url } of connectionUrls) {
