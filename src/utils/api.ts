@@ -1,19 +1,28 @@
 // API configuration with environment-based URL
 const getApiBaseUrl = (): string => {
+  // Check for emergency API URL first (set by fix-api-url.js)
+  if ((window as any).EMERGENCY_API_URL) {
+    console.log('🚑 Using emergency API URL:', (window as any).EMERGENCY_API_URL);
+    return (window as any).EMERGENCY_API_URL;
+  }
+  
   // Production URL - deployed backend
   const PRODUCTION_API_URL = 'https://homebase-gear-guard.onrender.com/api';
   
-  // Check environment variables first
+  // Check environment variables
   if (import.meta.env.VITE_API_URL) {
+    console.log('🌐 Using VITE_API_URL:', import.meta.env.VITE_API_URL);
     return import.meta.env.VITE_API_URL;
   }
   
   // Determine based on current location
   if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
     // Development environment
+    console.log('💻 Using development API URL');
     return 'http://localhost:3001/api';
   } else {
     // Production environment
+    console.log('🚀 Using production API URL');
     return PRODUCTION_API_URL;
   }
 };

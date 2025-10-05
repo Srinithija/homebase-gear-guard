@@ -7,16 +7,58 @@ const MAINTENANCE_KEY = 'homebase_maintenance';
 const CONTACTS_KEY = 'homebase_contacts';
 
 // Check if we should use API or localStorage
-const useAPI = true; // Set to false for offline development
+// Set to false for immediate offline mode if API is failing
+const useAPI = (() => {
+  // Check if we're in development
+  const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+  
+  // Check for CSP/API connectivity issues
+  const hasAPIIssues = (() => {
+    try {
+      // Quick check for obvious API URL issues
+      const apiUrl = import.meta.env.VITE_API_URL || 
+        (isDev ? 'http://localhost:3001/api' : 'https://homebase-gear-guard.onrender.com/api');
+      
+      console.log('🔍 Checking API configuration...');
+      console.log('Current hostname:', window.location.hostname);
+      console.log('Intended API URL:', apiUrl);
+      
+      // If production is trying to use localhost, force localStorage mode
+      if (!isDev && apiUrl.includes('localhost')) {
+        console.warn('⚠️ Production detected with localhost API URL - forcing localStorage mode');
+        return true;
+      }
+      
+      return false;
+    } catch (error) {
+      console.error('Error checking API config:', error);
+      return true;
+    }
+  })();
+  
+  if (hasAPIIssues) {
+    console.log('💾 Using localStorage fallback mode due to API configuration issues');
+    return false;
+  }
+  
+  console.log('🌐 Using API mode');
+  return true;
+})();
 
-// Helper function to check if error is a Supabase connection issue
-const isSupabaseConnectionError = (error: any): boolean => {
+// Helper function to check if error is a Supabase connection issue or CSP violation
+const isConnectionError = (error: any): boolean => {
   if (!error || typeof error !== 'object') return false;
   const message = error.message || '';
+  
+  // Check for various connection issues
   return message.includes('Tenant or user not found') || 
          message.includes('ENETUNREACH') || 
          message.includes('connection refused') ||
-         message.includes('timeout');
+         message.includes('timeout') ||
+         message.includes('Failed to fetch') ||
+         message.includes('Content Security Policy') ||
+         message.includes('CSP') ||
+         message.includes('violates the following Content Security Policy directive');
 };
 
 // Appliance storage functions
@@ -30,9 +72,9 @@ export const getAppliances = async (): Promise<Appliance[]> => {
     } catch (error) {
       console.error('❌ Failed to fetch appliances from API:', error);
       
-      // If it's a Supabase connection error, provide specific guidance
-      if (isSupabaseConnectionError(error)) {
-        throw new Error('🚨 Database temporarily unavailable - Supabase project may be paused. Please check: https://app.supabase.com/project/llwasxekjvvezufpyolq');
+      // If it's a connection error (including CSP violations), provide specific guidance
+      if (isConnectionError(error)) {
+        throw new Error('🚨 Connection failed - Using localStorage mode. Check: API configuration or database availability');
       }
       
       // For other errors, provide general error message
@@ -58,9 +100,9 @@ export const addAppliance = async (appliance: Omit<Appliance, 'id' | 'createdAt'
     } catch (error) {
       console.error('Failed to create appliance via API:', error);
       
-      // If it's a Supabase connection error, throw specific error
-      if (isSupabaseConnectionError(error)) {
-        throw new Error('🚨 Cannot save data - Database temporarily unavailable. Supabase project may be paused. Please check: https://app.supabase.com/project/llwasxekjvvezufpyolq');
+      // If it's a connection error (including CSP violations), throw specific error
+      if (isConnectionError(error)) {
+        throw new Error('🚨 Cannot save data - Connection failed. Using localStorage mode instead.');
       }
       
       // For other errors, fall back to localStorage
