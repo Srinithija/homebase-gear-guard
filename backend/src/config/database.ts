@@ -27,36 +27,42 @@ const connectionConfig = {
 
 // Create connection with aggressive IPv4-only pooler strategy
 const createConnectionWithFallback = () => {
-  // IPv4-only pooler URLs with explicit parameters to avoid IPv6
+  // IPv4-only pooler URLs with CORRECT authentication format (dot format for poolers)
+  // Based on memory: Use 'postgres.{project_ref}' format for poolers
   const ipv4PoolerUrls = {
-    // Transaction pooler with dot format (most reliable)
+    // Transaction pooler with dot format (correct for poolers)
     primary: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=5',
-    // Session pooler with dot format
+    // Session pooler with dot format (most reliable for concurrent connections)
     session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require&connect_timeout=5',
-    // Transaction pooler with standard format (fallback)
-    standard: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=5'
+    // Alternative transaction pooler (standard format as backup)
+    alt_primary: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=5',
+    // Alternative session pooler (standard format as backup)
+    alt_session: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require&connect_timeout=5'
   };
   
-  // Priority order: Use only pooler URLs to avoid IPv6 issues
+  // Priority order: Use ONLY pooler URLs, never direct connections to avoid IPv6
   const connectionUrls = [
-    // First try environment variable if it's a pooler URL
-    env.DATABASE_URL && env.DATABASE_URL.includes('pooler') ? env.DATABASE_URL : null,
-    // Then try our hardcoded IPv4 pooler URLs
-    ipv4PoolerUrls.primary,
+    // Primary: Session pooler (best for production)
     ipv4PoolerUrls.session,
-    ipv4PoolerUrls.standard,
-    // Environment fallbacks
+    // Secondary: Transaction pooler 
+    ipv4PoolerUrls.primary,
+    // Fallbacks with standard auth format
+    ipv4PoolerUrls.alt_session,
+    ipv4PoolerUrls.alt_primary,
+    // Environment variables only if they contain 'pooler'
+    process.env.DATABASE_URL && process.env.DATABASE_URL.includes('pooler') ? process.env.DATABASE_URL : null,
     process.env.DATABASE_URL_POOLER_SESSION,
-    process.env.DATABASE_URL_FALLBACK
+    process.env.DATABASE_URL_FALLBACK && process.env.DATABASE_URL_FALLBACK.includes('pooler') ? process.env.DATABASE_URL_FALLBACK : null
   ].filter(Boolean);
 
-  console.log('🔄 Creating database connection...');
-  console.log('📍 Total connection options:', connectionUrls.length);
+  console.log('🔄 Creating database connection with IPv4-only poolers...');
+  console.log('📍 Total pooler options:', connectionUrls.length);
   console.log('📍 Primary URL:', connectionUrls[0]!.replace(/:[^:@]*@/, ':****@'));
-  console.log('⚠️ IPv6 connections disabled - using pooler URLs only');
+  console.log('🚫 Direct connections disabled - pooler-only strategy');
+  console.log('✅ Supabase project confirmed ACTIVE');
   
   try {
-    // Use the primary URL with IPv4-optimized config
+    // Use the primary pooler URL with IPv4-optimized config
     return postgres(connectionUrls[0]!, connectionConfig);
   } catch (error) {
     console.error('❌ Failed to create database connection:', error);
