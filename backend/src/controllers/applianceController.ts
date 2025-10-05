@@ -1,36 +1,92 @@
 import { Request, Response, NextFunction } from 'express';
 import { eq, desc, sql } from 'drizzle-orm';
-import { db } from '../config/database';
+import { db, isDatabaseAvailable } from '../config/database';
 import { appliances, maintenanceTasks, contacts } from '../db/schema';
 import { successResponse, errorResponse } from '../utils/responses';
 import { FilterParams, ApplianceStats } from '../types';
 
-// Helper function to handle Supabase connection errors
-const handleDatabaseError = (error: any, res: Response, fallbackData: any = null) => {
-  if (error && typeof error === 'object' && 'message' in error && 
-      (error.message as string).includes('Tenant or user not found')) {
+// Enhanced database error handler
+const handleDatabaseError = async (error: any, res: Response, fallbackData: any = null) => {
+  console.error('❌ Database error:', error);
+  
+  // Check if database is available
+  const dbAvailable = await isDatabaseAvailable();
+  if (!dbAvailable) {
     return res.status(503).json({
       success: false,
-      message: '🚨 Database temporarily unavailable - Supabase project may be paused',
+      message: '🚨 Database temporarily unavailable',
       data: fallbackData,
       fallbackMode: true,
+      error: 'DATABASE_UNAVAILABLE',
       instructions: {
-        action: 'Resume Supabase Project',
-        url: 'https://app.supabase.com/project/llwasxekjvvezufpyolq',
-        steps: [
-          '1. Visit Supabase dashboard',
-          '2. Check if project is paused',
-          '3. Click "Resume" or upgrade plan',
-          '4. Refresh this page'
+        action: 'Database connection failed',
+        details: 'The backend cannot connect to the database. This may be due to:',
+        causes: [
+          'Supabase project is paused (most common)',
+          'Network connectivity issues',
+          'Database server maintenance',
+          'IPv6 connection problems'
+        ],
+        solutions: [
+          '1. Visit: https://app.supabase.com/project/llwasxekjvvezufpyolq',
+          '2. Check if project is paused and click "Resume"',
+          '3. Upgrade to paid plan to avoid auto-pausing',
+          '4. Contact support if issues persist'
         ]
       }
     });
   }
+  
+  // Handle specific error types
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = error.message as string;
+    
+    if (message.includes('Tenant or user not found')) {
+      return res.status(503).json({
+        success: false,
+        message: '🚨 Supabase project is paused',
+        data: fallbackData,
+        fallbackMode: true,
+        error: 'SUPABASE_PAUSED',
+        instructions: {
+          action: 'Resume Supabase Project',
+          url: 'https://app.supabase.com/project/llwasxekjvvezufpyolq'
+        }
+      });
+    }
+    
+    if (message.includes('ENETUNREACH') || message.includes('connect')) {
+      return res.status(503).json({
+        success: false,
+        message: '🚨 Network connectivity issue',
+        data: fallbackData,
+        fallbackMode: true,
+        error: 'NETWORK_UNREACHABLE',
+        instructions: {
+          action: 'Check database connectivity',
+          details: 'IPv6 or network routing issue detected'
+        }
+      });
+    }
+  }
+  
   return null;
 };
 
 export const getAppliances = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Check database availability first
+    const dbAvailable = await isDatabaseAvailable();
+    if (!dbAvailable) {
+      return res.status(503).json({
+        success: false,
+        message: '🚨 Database unavailable - using fallback mode',
+        data: [],
+        fallbackMode: true,
+        error: 'DATABASE_UNAVAILABLE'
+      });
+    }
+    
     const { search, status } = req.query as FilterParams;
     
     // Build the where condition based on search
@@ -70,7 +126,7 @@ export const getAppliances = async (req: Request, res: Response, next: NextFunct
     return successResponse(res, filteredAppliances, 'Appliances retrieved successfully');
   } catch (error) {
     // Handle database connection issues
-    const handled = handleDatabaseError(error, res, []);
+    const handled = await handleDatabaseError(error, res, []);
     if (handled) return handled;
     
     next(error);

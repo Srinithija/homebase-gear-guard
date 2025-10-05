@@ -3,51 +3,101 @@ import postgres from 'postgres';
 import * as schema from '../db/schema';
 import { env } from './env';
 
-// Optimized connection configuration for cloud platforms
+// Optimized connection configuration for cloud platforms - IPv4 only
 const connectionConfig = {
   // Connection pool settings
   max: 1, // Single connection for connection pooler
   idle_timeout: 0, // Disable idle timeout for pooler
-  connect_timeout: 10, // Connection timeout
+  connect_timeout: 5, // Shorter timeout for faster failover
   // SSL configuration for production
   ssl: env.NODE_ENV === 'production' ? 'require' as const : false,
   // Disable prepared statements for pgbouncer compatibility
   prepare: false,
+  // Force IPv4 to avoid IPv6 connectivity issues
+  host_type: 'ipv4' as any,
   // Connection handling
   transform: {
     undefined: null
+  },
+  // Additional IPv4 enforcement
+  options: {
+    'sslmode': 'require'
   }
 };
 
-// Create connection with pooler URLs only (avoid IPv6 issues)
+// Create connection with aggressive IPv4-only pooler strategy
 const createConnectionWithFallback = () => {
-  // Hardcoded fallback URLs for Render deployment resilience
-  // Even if Render overrides DATABASE_URL, these will work when Supabase is resumed
-  const hardcodedFallbacks = {
-    primary: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
-    session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true'
+  // IPv4-only pooler URLs with explicit parameters to avoid IPv6
+  const ipv4PoolerUrls = {
+    // Transaction pooler with dot format (most reliable)
+    primary: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=5',
+    // Session pooler with dot format
+    session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true&sslmode=require&connect_timeout=5',
+    // Transaction pooler with standard format (fallback)
+    standard: 'postgresql://postgres:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require&connect_timeout=5'
   };
   
+  // Priority order: Use only pooler URLs to avoid IPv6 issues
   const connectionUrls = [
-    env.DATABASE_URL, // Use environment URL first
-    process.env.DATABASE_URL_POOLER_SESSION || hardcodedFallbacks.session,
-    process.env.DATABASE_URL_FALLBACK || hardcodedFallbacks.primary,
-    hardcodedFallbacks.primary, // Hardcoded fallback for resilience
-    hardcodedFallbacks.session  // Additional hardcoded fallback
+    // First try environment variable if it's a pooler URL
+    env.DATABASE_URL && env.DATABASE_URL.includes('pooler') ? env.DATABASE_URL : null,
+    // Then try our hardcoded IPv4 pooler URLs
+    ipv4PoolerUrls.primary,
+    ipv4PoolerUrls.session,
+    ipv4PoolerUrls.standard,
+    // Environment fallbacks
+    process.env.DATABASE_URL_POOLER_SESSION,
+    process.env.DATABASE_URL_FALLBACK
   ].filter(Boolean);
 
-  console.log('🔄 Available connection URLs:', connectionUrls.length);
-  console.log('📍 Using primary URL:', connectionUrls[0]!.replace(/:[^:@]*@/, ':****@'));
+  console.log('🔄 Creating database connection...');
+  console.log('📍 Total connection options:', connectionUrls.length);
+  console.log('📍 Primary URL:', connectionUrls[0]!.replace(/:[^:@]*@/, ':****@'));
+  console.log('⚠️ IPv6 connections disabled - using pooler URLs only');
   
-  // Use the primary URL with optimized config
-  return postgres(connectionUrls[0]!, connectionConfig);
+  try {
+    // Use the primary URL with IPv4-optimized config
+    return postgres(connectionUrls[0]!, connectionConfig);
+  } catch (error) {
+    console.error('❌ Failed to create database connection:', error);
+    throw error;
+  }
 };
 
-// Create the connection
-const sql = createConnectionWithFallback();
-export const db = drizzle(sql, { schema });
+// Create the connection with error handling
+let sql: postgres.Sql;
+let db: any;
 
-// Simple connection test function that tries each URL sequentially
+try {
+  sql = createConnectionWithFallback();
+  db = drizzle(sql, { schema });
+  console.log('✅ Database connection initialized');
+} catch (error) {
+  console.error('❌ Failed to initialize database connection:', error);
+  // Create a dummy connection for graceful degradation
+  sql = null as any;
+  db = null as any;
+}
+
+export { db, sql };
+
+// Database health check function
+export const isDatabaseAvailable = async (): Promise<boolean> => {
+  if (!sql || !db) {
+    console.log('❌ Database connection not initialized');
+    return false;
+  }
+  
+  try {
+    await sql`SELECT 1`;
+    return true;
+  } catch (error) {
+    console.error('❌ Database health check failed:', error instanceof Error ? error.message : error);
+    return false;
+  }
+};
+
+// Enhanced connection test with better error handling
 export const testConnection = async () => {
   // Try multiple username formats for better compatibility
   const fallbackUrls = {

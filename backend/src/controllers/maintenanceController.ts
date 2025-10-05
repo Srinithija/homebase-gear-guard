@@ -1,11 +1,42 @@
 import { Request, Response, NextFunction } from 'express';
+import { Request, Response, NextFunction } from 'express';
 import { eq, desc, and, lte, gte, sql } from 'drizzle-orm';
-import { db } from '../config/database';
+import { db, isDatabaseAvailable } from '../config/database';
 import { maintenanceTasks, appliances } from '../db/schema';
 import { successResponse, errorResponse } from '../utils/responses';
 
+// Enhanced database error handler
+const handleDatabaseError = async (error: any, res: Response, fallbackData: any = null) => {
+  console.error('❌ Database error in maintenance controller:', error);
+  
+  const dbAvailable = await isDatabaseAvailable();
+  if (!dbAvailable) {
+    return res.status(503).json({
+      success: false,
+      message: '🚨 Database temporarily unavailable',
+      data: fallbackData,
+      fallbackMode: true,
+      error: 'DATABASE_UNAVAILABLE'
+    });
+  }
+  
+  return null;
+};
+
 export const getMaintenanceTasks = async (req: Request, res: Response, next: NextFunction) => {
   try {
+    // Check database availability first
+    const dbAvailable = await isDatabaseAvailable();
+    if (!dbAvailable) {
+      return res.status(503).json({
+        success: false,
+        message: '🚨 Database unavailable - using fallback mode',
+        data: [],
+        fallbackMode: true,
+        error: 'DATABASE_UNAVAILABLE'
+      });
+    }
+    
     const { applianceId } = req.query;
     
     const tasks = applianceId ? 
@@ -14,6 +45,9 @@ export const getMaintenanceTasks = async (req: Request, res: Response, next: Nex
     
     return successResponse(res, tasks, 'Maintenance tasks retrieved successfully');
   } catch (error) {
+    const handled = await handleDatabaseError(error, res, []);
+    if (handled) return handled;
+    
     next(error);
   }
 };
