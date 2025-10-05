@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
-import { X, RefreshCw, AlertTriangle } from "lucide-react";
+import { X, RefreshCw, AlertTriangle, CheckCircle } from "lucide-react";
+import { forceApiRetry } from '@/utils/storage';
 
 interface FallbackModeNotificationProps {
   show?: boolean;
@@ -21,10 +22,13 @@ export const FallbackModeNotification: React.FC<FallbackModeNotificationProps> =
 
   const handleRetry = async () => {
     setIsRetrying(true);
-    // Wait a moment and reload the page to retry API connection
-    setTimeout(() => {
-      window.location.reload();
-    }, 1000);
+    // Force clear API failure status and retry
+    try {
+      forceApiRetry(); // This will reload the page
+    } catch (error) {
+      console.error('Error during API retry:', error);
+      setIsRetrying(false);
+    }
   };
 
   const handleDismiss = () => {

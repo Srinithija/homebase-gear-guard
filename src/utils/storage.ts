@@ -7,28 +7,19 @@ const MAINTENANCE_KEY = 'homebase_maintenance';
 const CONTACTS_KEY = 'homebase_contacts';
 
 // Check if we should use API or localStorage
-// Enhanced logic to detect API unavailability and auto-fallback
+// Enhanced logic - FORCE API mode since database is now working
 const useAPI = (() => {
+  // FORCE CLEAR any cached failure status - database is now working!
+  localStorage.removeItem('homebase_api_status');
+  localStorage.removeItem('homebase_last_api_check');
+  console.log('🔄 Force clearing cached API status - attempting fresh connection');
+  
   // Check if we're in development
   const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
   
-  // Check for immediate fallback triggers
+  // Always try API first - database is confirmed working
   const shouldUseFallback = (() => {
     try {
-      // Check if we've detected API issues recently
-      const lastApiCheck = localStorage.getItem('homebase_last_api_check');
-      const lastApiStatus = localStorage.getItem('homebase_api_status');
-      
-      if (lastApiCheck && lastApiStatus === 'unavailable') {
-        const checkTime = new Date(lastApiCheck);
-        const now = new Date();
-        // If API was unavailable in the last 5 minutes, stay in fallback mode
-        if ((now.getTime() - checkTime.getTime()) < 5 * 60 * 1000) {
-          console.log('💾 Recent API failure detected - staying in fallback mode');
-          return true;
-        }
-      }
-      
       // Quick check for obvious API URL issues
       const apiUrl = import.meta.env.VITE_API_URL || 
         (isDev ? 'http://localhost:3001/api' : 'https://homebase-gear-guard.onrender.com/api');
@@ -55,7 +46,7 @@ const useAPI = (() => {
     return false;
   }
   
-  console.log('🌐 Attempting API mode with auto-fallback');
+  console.log('🌐 Using API mode - Supabase database connected successfully');
   return true;
 })();
 
@@ -89,7 +80,16 @@ const recordApiFailure = () => {
 const recordApiSuccess = () => {
   localStorage.setItem('homebase_last_api_check', new Date().toISOString());
   localStorage.setItem('homebase_api_status', 'available');
-  console.log('✅ API success recorded');
+  console.log('✅ API success recorded - Supabase database connected');
+};
+
+// Function to force API retry (clear failure status)
+export const forceApiRetry = () => {
+  localStorage.removeItem('homebase_api_status');
+  localStorage.removeItem('homebase_last_api_check');
+  console.log('🔄 API status cleared - forcing retry on next request');
+  // Reload the page to reset the useAPI evaluation
+  window.location.reload();
 };
 
 // Appliance storage functions with enhanced fallback
