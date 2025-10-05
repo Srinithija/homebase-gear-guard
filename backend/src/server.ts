@@ -30,46 +30,99 @@ app.use('/api', routes);
 // Health check with database status and fallback mode
 app.get('/health', async (req, res) => {
   try {
-    // Quick database connection test
+    // Always return 200 OK for basic health check (Render requirement)
+    // Database connection test only for detailed health info
+    const isDetailedHealthCheck = req.query.detailed === 'true';
+    
+    if (isDetailedHealthCheck) {
+      // Only run full database test if explicitly requested
+      const dbConnected = await testConnection();
+      
+      if (dbConnected) {
+        res.json({ 
+          status: 'OK', 
+          timestamp: new Date().toISOString(),
+          environment: env.NODE_ENV,
+          database: 'Connected',
+          fallbackMode: false,
+          version: '1.0.0',
+          message: 'All systems operational'
+        });
+      } else {
+        res.status(200).json({ 
+          status: 'DEGRADED', 
+          timestamp: new Date().toISOString(),
+          environment: env.NODE_ENV,
+          database: 'Disconnected - Using Fallback Mode',
+          fallbackMode: true,
+          version: '1.0.0',
+          message: '⚠️ Database unavailable - App running in fallback mode. Check Supabase project status.',
+          instructions: {
+            action: 'Check Supabase Dashboard',
+            url: 'https://app.supabase.com/project/llwasxekjvvezufpyolq'
+          }
+        });
+      }
+    } else {
+      // Quick health check for Render (no database test)
+      res.json({ 
+        status: 'OK', 
+        timestamp: new Date().toISOString(),
+        environment: env.NODE_ENV,
+        uptime: process.uptime(),
+        version: '1.0.0',
+        message: 'Service is running',
+        note: 'Add ?detailed=true for database status'
+      });
+    }
+  } catch (error) {
+    // Even on error, return 200 to keep Render deployment alive
+    res.status(200).json({
+      status: 'OK', 
+      timestamp: new Date().toISOString(),
+      environment: env.NODE_ENV,
+      uptime: process.uptime(),
+      version: '1.0.0',
+      message: 'Service is running (basic health check)',
+      note: 'Add ?detailed=true for database status'
+    });
+  }
+});
+
+// Separate database health check endpoint for monitoring
+app.get('/health/database', async (req, res) => {
+  try {
+    console.log('📊 Running database health check...');
     const dbConnected = await testConnection();
     
     if (dbConnected) {
       res.json({ 
         status: 'OK', 
         timestamp: new Date().toISOString(),
-        environment: env.NODE_ENV,
         database: 'Connected',
-        fallbackMode: false,
-        version: '1.0.0',
-        message: 'All systems operational'
+        message: 'Database connection successful'
       });
     } else {
-      // Database disconnected but app is still functional
-      res.status(200).json({ 
+      res.status(503).json({ 
         status: 'DEGRADED', 
         timestamp: new Date().toISOString(),
-        environment: env.NODE_ENV,
-        database: 'Disconnected - Using Fallback Mode',
-        fallbackMode: true,
-        version: '1.0.0',
-        message: '⚠️ Database unavailable - App running in fallback mode. Check Supabase project status.',
+        database: 'Disconnected',
+        message: 'Database connection failed - check Supabase project status',
         instructions: {
-          action: 'Check Supabase Dashboard',
+          action: 'Resume Supabase Project',
           url: 'https://app.supabase.com/project/llwasxekjvvezufpyolq'
         }
       });
     }
   } catch (error) {
-    res.status(200).json({ // Keep 200 to indicate app is still running
-      status: 'FALLBACK', 
+    res.status(503).json({
+      status: 'ERROR', 
       timestamp: new Date().toISOString(),
-      environment: env.NODE_ENV,
-      database: 'Error - Fallback Mode Active',
-      fallbackMode: true,
+      database: 'Error',
       error: error instanceof Error ? error.message : 'Unknown error',
-      message: '🚨 Database connection failed - App running in fallback mode',
+      message: 'Database health check failed',
       instructions: {
-        action: 'Resume Supabase Project',
+        action: 'Check Supabase Dashboard',
         url: 'https://app.supabase.com/project/llwasxekjvvezufpyolq'
       }
     });

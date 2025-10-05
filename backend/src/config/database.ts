@@ -21,14 +21,19 @@ const connectionConfig = {
 
 // Create connection with pooler URLs only (avoid IPv6 issues)
 const createConnectionWithFallback = () => {
-  // Use pooler URLs only to avoid IPv6 connectivity issues
-  const poolerUrl = 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require';
+  // Hardcoded fallback URLs for Render deployment resilience
+  // Even if Render overrides DATABASE_URL, these will work when Supabase is resumed
+  const hardcodedFallbacks = {
+    primary: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:5432/postgres?sslmode=require',
+    session: 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true'
+  };
   
   const connectionUrls = [
-    env.DATABASE_URL.includes('pooler') ? env.DATABASE_URL : poolerUrl, // Primary: Use pooler if main URL is old
-    process.env.DATABASE_URL_POOLER_SESSION || 'postgresql://postgres.llwasxekjvvezufpyolq:Srinithija02@aws-0-ap-south-1.pooler.supabase.com:6543/postgres?pgbouncer=true',
-    process.env.DATABASE_URL_FALLBACK || poolerUrl, // Pooler connection with timeout
-    poolerUrl // Final fallback to pooler
+    env.DATABASE_URL, // Use environment URL first
+    process.env.DATABASE_URL_POOLER_SESSION || hardcodedFallbacks.session,
+    process.env.DATABASE_URL_FALLBACK || hardcodedFallbacks.primary,
+    hardcodedFallbacks.primary, // Hardcoded fallback for resilience
+    hardcodedFallbacks.session  // Additional hardcoded fallback
   ].filter(Boolean);
 
   console.log('🔄 Available connection URLs:', connectionUrls.length);
